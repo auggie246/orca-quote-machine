@@ -104,11 +104,11 @@ Key settings in `.env`:
 
 ### Slicer Profiles
 
-Place OrcaSlicer configuration files in `config/slicer_profiles/`:
+The application requires OrcaSlicer configuration files in `config/slicer_profiles/`:
 ```
 config/slicer_profiles/
-├── printer/
-│   └── default_printer.ini
+├── machine/
+│   └── default_machine.ini
 ├── filament/
 │   ├── pla.ini
 │   ├── petg.ini
@@ -116,6 +116,42 @@ config/slicer_profiles/
 └── process/
     └── standard_0.2mm.ini
 ```
+
+#### Setting up OrcaSlicer Profiles
+
+**Option 1: Symlink from existing OrcaSlicer installation**
+```bash
+# Find your OrcaSlicer config directory
+# Linux: ~/.config/OrcaSlicer/ or ~/.OrcaSlicer/
+# macOS: ~/Library/Application Support/OrcaSlicer/
+# Windows: %APPDATA%\OrcaSlicer\
+
+# Create symlinks to your existing profiles
+ln -s ~/.config/OrcaSlicer/machine config/slicer_profiles/machine
+ln -s ~/.config/OrcaSlicer/filament config/slicer_profiles/filament  
+ln -s ~/.config/OrcaSlicer/process config/slicer_profiles/process
+```
+
+**Option 2: Copy profiles manually**
+```bash
+# Copy from OrcaSlicer installation
+cp -r ~/.config/OrcaSlicer/machine config/slicer_profiles/
+cp -r ~/.config/OrcaSlicer/filament config/slicer_profiles/
+cp -r ~/.config/OrcaSlicer/process config/slicer_profiles/
+
+# Rename/select your desired profiles
+mv config/slicer_profiles/machine/your_printer.ini config/slicer_profiles/machine/default_machine.ini
+mv config/slicer_profiles/process/your_process.ini config/slicer_profiles/process/standard_0.2mm.ini
+```
+
+**Required Profile Files:**
+- `machine/default_machine.ini` - Your 3D printer configuration
+- `filament/pla.ini` - PLA material settings
+- `filament/petg.ini` - PETG material settings (optional)
+- `filament/asa.ini` - ASA material settings (optional)
+- `process/standard_0.2mm.ini` - Print settings (layer height, speeds, etc.)
+
+**Note:** Ensure the G-code settings include `G92 E0` in layer change G-code to prevent slicing errors.
 
 ## Usage
 

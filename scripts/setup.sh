@@ -24,7 +24,7 @@ echo "Building Rust components..."
 uv run maturin develop
 
 echo "Creating necessary directories..."
-mkdir -p uploads static config/slicer_profiles/{printer,filament,process}
+mkdir -p uploads static config/slicer_profiles/{machine,filament,process}
 
 echo "Setting up environment file..."
 if [ ! -f .env ]; then

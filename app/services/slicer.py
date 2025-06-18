@@ -31,7 +31,7 @@ class OrcaSlicerService:
         material = material or MaterialType.PLA
         
         profiles = {
-            "printer": self.profiles_dir / "printer" / "default_printer.ini",
+            "machine": self.profiles_dir / "machine" / "default_machine.ini",
             "filament": self.profiles_dir / "filament" / f"{material.value.lower()}.ini",
             "process": self.profiles_dir / "process" / "standard_0.2mm.ini",
         }
@@ -73,7 +73,7 @@ class OrcaSlicerService:
                 self.cli_path,
                 model_path,
                 "--slice", "0",  # Slice all plates
-                "--load-settings", f"{profiles['printer']};{profiles['process']}",
+                "--load-settings", f"{profiles['machine']};{profiles['process']}",
                 "--load-filaments", profiles['filament'],
                 "--export-slicedata", str(output_dir),
                 "--outputdir", str(output_dir),
