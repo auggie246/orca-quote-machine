@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel in-progress runs on the same branch when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          # Enable caching for uv's global package cache
+          cache: 'uv'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv-action@v1
+
+      # Use ruff-action v2 for linting. This provides rich annotations in PRs.
+      - name: Run ruff linter
+        uses: astral-sh/ruff-action@v2
+        with:
+          # Lint both your application and test code.
+          # Assumes project structure is app/ (python) and tests/.
+          src: "app tests"
+          check: true
+
+      # A separate step for format checking, as requested.
+      - name: Run ruff formatter check
+        uses: astral-sh/ruff-action@v2
+        with:
+          src: "app tests"
+          format: true
+
+      - name: Run mypy type checker
+        run: |
+          # Mypy needs the project's dependencies to perform accurate type analysis.
+          # This step ensures the environment is correctly configured before running mypy.
+          uv pip install -e ".[test]"
+          uv run mypy app tests
+
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    strategy:
+      # Run tests on all supported Python versions
+      matrix:
+        python-version: ['3.11', '3.12']
+      # Don't cancel other jobs in the matrix if one fails
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'uv'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv-action@v1
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      # This is the key step for intelligent Rust caching.
+      # It sets up sccache and configures cargo to use it automatically.
+      # The action handles its own GitHub Actions cache backend.
+      - name: Set up sccache for Rust compilation caching
+        uses: mozilla/sccache-action@v0.0.5
+
+      - name: Install dependencies and build Rust extension
+        # RUSTC_WRAPPER is set by the sccache-action, so cargo will use it.
+        # uv invokes pip, which invokes maturin, which invokes cargo.
+        run: uv pip install -e ".[test]"
+
+      - name: Run tests with pytest
+        # `uv run` executes the command within the managed virtual environment.
+        run: uv run pytest

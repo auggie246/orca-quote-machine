@@ -28,10 +28,14 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "httpx>=0.25.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
+    "ruff>=0.1.0",
     "mypy>=1.7.0",
     "maturin>=1.0.0",
+]
+test = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
 ]
 
 [dependency-groups]
@@ -39,8 +43,7 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "httpx>=0.25.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
+    "ruff>=0.1.0",
     "mypy>=1.7.0",
     "maturin>=1.0.0",
 ]
@@ -49,16 +52,80 @@ dev = [
 features = ["pyo3/extension-module"]
 module-name = "orca_quote_machine._rust_core"
 
-[tool.black]
-line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
+[tool.ruff]
+# Define the source directories for Ruff to scan.
+# Based on your structure, we'll target the Python application code and tests.
+src = ["app", "tests"]
 
-[tool.isort]
-profile = "black"
-line_length = 88
+# Exclude common directories, build artifacts, and the Rust source directory.
+# This prevents Ruff from trying to parse files it shouldn't.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "target", # Exclude Rust build artifacts
+    "src",    # Exclude the Rust source code directory
+]
+
+# Target the lowest Python version you support (from your CI matrix).
+# This ensures code is compatible and uses modern features available in 3.11+.
+target-version = "py311"
+
+[tool.ruff.lint]
+# A curated set of rules for a modern, robust, and performant application.
+# E/F: pyflakes/pycodestyle (core)  W: pycodestyle warnings
+# I: isort (import sorting)        UP: pyupgrade (modernize code)
+# B: flake8-bugbear (find bugs)    C4: flake8-comprehensions (cleaner comprehensions)
+# SIM: flake8-simplify (simplify code)
+# ANN: flake8-annotations (type hint best practices)
+# PYD: pydantic-specific rules
+# ASYNC: flake8-async rules
+# TID: flake8-tidy-imports (cleaner imports)
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "ANN", "ASYNC", "TID"]
+
+# Ignore rules that are incompatible with common FastAPI/Pydantic patterns.
+ignore = [
+    "B008",    # FastAPI's Depends() uses function calls in argument defaults.
+    "ANN101",  # Missing type annotation for `self` can be noisy. Can be enabled later for stricter checks.
+    "ANN401",  # Allow `typing.Any` for now. Can be removed for a very strict policy.
+]
+
+[tool.ruff.lint.flake8-annotations]
+# Allow __init__ methods to have no return type annotation.
+mypy-init-return = true
+# Allow missing return types on functions that are decorated with @override
+suppress-none-returning = true
+
+[tool.ruff.lint.isort]
+# Define your project's own modules as "first-party".
+# This ensures `from app import ...` is sorted correctly.
+known-first-party = ["app"]
+
+
+[tool.ruff.format]
+# Opt-in to the Ruff formatter, replacing Black.
+# The configuration below is black-compatible.
+quote-style = "double"
+line-ending = "lf"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 disallow_untyped_defs = true
 no_implicit_optional = true
 warn_return_any = true
