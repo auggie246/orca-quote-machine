@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from app.core.config import get_settings
 from app.models.quote import MaterialType, SlicingResult
@@ -24,24 +24,79 @@ class OrcaSlicerService:
     def __init__(self):
         self.settings = get_settings()
         self.cli_path = self.settings.orcaslicer_cli_path
-        self.profiles_dir = Path(self.settings.slicer_profiles_dir)
+        self.profiles_dir = self.settings.slicer_profiles.base_dir
+        self.filament_profiles_dir = self.profiles_dir / "filament"
     
-    def get_profile_paths(self, material: Optional[MaterialType] = None) -> Dict[str, str]:
-        """Get paths to slicer profile files."""
-        material = material or MaterialType.PLA
-        
+    def _get_filament_profile_path(self, material_name: str) -> Path:
+        """
+        Gets the path to a filament profile using a hybrid strategy.
+        1. Checks for an explicit override in settings (e.g., `filament_pla`).
+        2. Falls back to a file-based convention (`material_name.ini`).
+        3. Raises a clear error if no profile is found.
+        """
+        profile_config = self.settings.slicer_profiles
+        material_lower = material_name.lower()
+
+        # 1. Check for an explicit override in settings (for official materials)
+        config_key = f"filament_{material_lower}"
+        if hasattr(profile_config, config_key):
+            profile_filename = getattr(profile_config, config_key)
+            profile_path = self.filament_profiles_dir / profile_filename
+            # The Pydantic validator already checked this at startup, so we can trust it exists.
+            return profile_path
+
+        # 2. Fallback to file-based convention for custom materials.
+        # Convention: material name 'TPU' maps to `tpu.ini`.
+        conventional_filename = f"{material_lower}.ini"
+        profile_path = self.filament_profiles_dir / conventional_filename
+        if profile_path.exists():
+            return profile_path
+
+        # 3. If no profile is found by any method, fail clearly.
+        raise SlicerError(
+            f"No profile found for material '{material_name}'. "
+            f"Looked for config override '{config_key}' and conventional file '{conventional_filename}'."
+        )
+    
+    def get_profile_paths(self, material: Optional[Union[MaterialType, str]] = None) -> Dict[str, str]:
+        """
+        Resolves full paths for machine, process, and the correct filament profile.
+        Accepts an enum member or a raw string for the material.
+        """
+        # Default to PLA if no material is provided.
+        material_name = getattr(material, 'value', material) or MaterialType.PLA.value
+
+        profile_config = self.settings.slicer_profiles
+        filament_profile_path = self._get_filament_profile_path(material_name)
+
         profiles = {
-            "printer": self.profiles_dir / "printer" / "default_printer.ini",
-            "filament": self.profiles_dir / "filament" / f"{material.value.lower()}.ini",
-            "process": self.profiles_dir / "process" / "standard_0.2mm.ini",
+            "machine": self.profiles_dir / "machine" / profile_config.machine,
+            "filament": filament_profile_path,
+            "process": self.profiles_dir / "process" / profile_config.process,
         }
-        
-        # Verify all profiles exist
-        for profile_type, path in profiles.items():
-            if not path.exists():
-                raise SlicerError(f"Profile not found: {profile_type} at {path}")
-        
-        return {k: str(v) for k, v in profiles.items()}
+
+        return {k: str(v.resolve()) for k, v in profiles.items()}
+    
+    def get_available_materials(self) -> List[str]:
+        """
+        Discovers all available materials for populating UI elements.
+        Combines official materials from the enum with custom materials
+        found as .ini files in the filament profile directory.
+        """
+        # 1. Start with official materials from the enum
+        official_materials = {m.value for m in MaterialType}
+
+        # 2. Scan the filesystem for all .ini files
+        discovered_materials = set()
+        if self.filament_profiles_dir.is_dir():
+            for f in self.filament_profiles_dir.glob("*.ini"):
+                # Convert 'generic_tpu.ini' -> 'generic_tpu'
+                material_name = f.stem.upper()  # Convert to uppercase for consistency
+                discovered_materials.add(material_name)
+
+        # 3. Combine, ensuring original casing is preferred, and sort.
+        all_materials = sorted(list(official_materials.union(discovered_materials)))
+        return all_materials
     
     async def slice_model(self, 
                          model_path: str, 
@@ -73,7 +128,7 @@ class OrcaSlicerService:
                 self.cli_path,
                 model_path,
                 "--slice", "0",  # Slice all plates
-                "--load-settings", f"{profiles['printer']};{profiles['process']}",
+                "--load-settings", f"{profiles['machine']};{profiles['process']}",
                 "--load-filaments", profiles['filament'],
                 "--export-slicedata", str(output_dir),
                 "--outputdir", str(output_dir),
