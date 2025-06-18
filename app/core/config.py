@@ -2,9 +2,49 @@
 
 from functools import lru_cache
 from typing import List, Optional
+from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import validator
+from pydantic import BaseModel, validator
 import os
+
+
+class SlicerProfileSettings(BaseModel):
+    """Configuration for default slicer profiles."""
+    base_dir: Path = Path("config/slicer_profiles")
+    
+    # Default machine and process profiles
+    machine: str = "default_machine.ini"
+    process: str = "standard_0.2mm.ini"
+    
+    # Per-material filament profiles for official materials
+    # These act as overrides for the default file-based convention
+    filament_pla: str = "pla.ini"
+    filament_petg: str = "petg.ini"
+    filament_asa: str = "asa.ini"
+    
+    @validator("machine")
+    def machine_profile_must_exist(cls, v, values):
+        base_dir = values.get("base_dir", Path("config/slicer_profiles"))
+        profile_path = base_dir / "machine" / v
+        if not profile_path.exists():
+            raise ValueError(f"Machine profile not found at: {profile_path}")
+        return v
+    
+    @validator("process")
+    def process_profile_must_exist(cls, v, values):
+        base_dir = values.get("base_dir", Path("config/slicer_profiles"))
+        profile_path = base_dir / "process" / v
+        if not profile_path.exists():
+            raise ValueError(f"Process profile not found at: {profile_path}")
+        return v
+    
+    @validator("filament_pla", "filament_petg", "filament_asa")
+    def official_filament_profile_must_exist(cls, v, values):
+        base_dir = values.get("base_dir", Path("config/slicer_profiles"))
+        profile_path = base_dir / "filament" / v
+        if not profile_path.exists():
+            raise ValueError(f"Official filament profile not found at: {profile_path}")
+        return v
 
 
 class Settings(BaseSettings):
@@ -26,7 +66,7 @@ class Settings(BaseSettings):
     # OrcaSlicer settings
     orcaslicer_cli_path: str = "/var/lib/flatpak/exports/bin/io.github.softfever.OrcaSlicer"
     slicer_timeout: int = 300  # 5 minutes
-    slicer_profiles_dir: str = "config/slicer_profiles"
+    slicer_profiles: SlicerProfileSettings = SlicerProfileSettings()
     
     # Pricing settings
     default_price_per_kg: float = 25.0  # S$25/kg for PLA
@@ -56,6 +96,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        env_nested_delimiter = "__"
     
     @validator("upload_dir")
     def create_upload_dir(cls, v):

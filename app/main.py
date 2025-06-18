@@ -14,6 +14,7 @@ import aiofiles
 
 from app.core.config import get_settings
 from app.models.quote import QuoteRequest, MaterialType
+from app.services.slicer import OrcaSlicerService
 from app.tasks import process_quote_request, celery_app
 
 settings = get_settings()
@@ -55,9 +56,17 @@ def secure_filename(filename: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Home page with quote request form."""
+    # Get available materials from slicer service (includes custom materials)
+    try:
+        slicer_service = OrcaSlicerService()
+        available_materials = slicer_service.get_available_materials()
+    except Exception:
+        # Fallback to enum values if slicer service fails
+        available_materials = [material.value for material in MaterialType]
+    
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "materials": [material.value for material in MaterialType],
+        "materials": available_materials,
         "max_file_size_mb": settings.max_file_size // (1024 * 1024),
         "allowed_extensions": ", ".join(settings.allowed_extensions),
     })
@@ -92,12 +101,23 @@ async def create_quote(
             detail=f"File type {file_ext} not allowed. Supported: {', '.join(settings.allowed_extensions)}"
         )
     
-    # Validate material
-    if material and material.upper() not in [m.value for m in MaterialType]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid material. Supported: {', '.join([m.value for m in MaterialType])}"
-        )
+    # Validate material against available materials (including custom ones)
+    if material:
+        try:
+            slicer_service = OrcaSlicerService()
+            available_materials = slicer_service.get_available_materials()
+            if material.upper() not in available_materials:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid material. Supported: {', '.join(available_materials)}"
+                )
+        except Exception as e:
+            # Fallback to enum validation if slicer service fails
+            if material.upper() not in [m.value for m in MaterialType]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid material. Supported: {', '.join([m.value for m in MaterialType])}"
+                )
     
     # Sanitize filename to prevent path traversal
     safe_filename = secure_filename(model_file.filename)

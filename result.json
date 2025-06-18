@@ -1,7 +1,7 @@
 {
-    "error_string": "There are some incorrect slicing parameters in the 3mf. Please verify the slicing of all plates in Orca Slicer before uploading.",
+    "error_string": "Success.",
     "export_time": 0,
-    "plate_index": 1,
+    "plate_index": 0,
     "prepare_time": 0,
-    "return_code": -51
+    "return_code": 0
 }

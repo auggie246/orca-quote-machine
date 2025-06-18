@@ -153,6 +153,31 @@ mv config/slicer_profiles/process/your_process.ini config/slicer_profiles/proces
 
 **Note:** Ensure the G-code settings include `G92 E0` in layer change G-code to prevent slicing errors.
 
+#### Custom Materials
+
+The system supports custom materials beyond the official PLA/PETG/ASA:
+
+1. **Add custom filament profile**: Place `your_material.ini` in `config/slicer_profiles/filament/`
+2. **No code changes needed**: The system automatically discovers new materials
+3. **Convention**: Material name matches filename (e.g., `TPU.ini` for TPU material)
+4. **Pricing**: Custom materials use PLA pricing by default
+
+#### Configuration Override
+
+You can override default profiles via environment variables:
+
+```bash
+# Override machine profile
+SLICER_PROFILES__MACHINE=Bambu_Lab_P1S_0.4_nozzle.ini
+
+# Override process settings  
+SLICER_PROFILES__PROCESS=0.20mm_Standard_@BBL_P1P.ini
+
+# Override official material profiles
+SLICER_PROFILES__FILAMENT_PLA=Generic_PLA.ini
+SLICER_PROFILES__FILAMENT_PETG=Generic_PETG.ini
+```
+
 ## Usage
 
 1. **User Flow:**
