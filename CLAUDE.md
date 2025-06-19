@@ -58,7 +58,7 @@ OrcaSlicer CLI → G-code Parsing → Pricing → Telegram Notification
 **Critical Settings:**
 ```python
 ORCASLICER_CLI_PATH=/var/lib/flatpak/exports/bin/io.github.softfever.OrcaSlicer
-SLICER_PROFILES_DIR=config/slicer_profiles/  # Required for material profiles
+SLICER_PROFILES_DIR=config/slicer_profiles/  # Required: machine/, filament/, process/ subdirs
 TELEGRAM_BOT_TOKEN=                          # For admin notifications
 TELEGRAM_ADMIN_CHAT_ID=                      # Where quotes are sent
 ```
@@ -85,9 +85,11 @@ TELEGRAM_ADMIN_CHAT_ID=                      # Where quotes are sent
 5. Results fed into pricing calculation
 
 **Profile Management:**
-- Profiles stored in `config/slicer_profiles/{printer,filament,process}/`
-- Material profiles: PLA (default), PETG, ASA
-- CLI integration may need adjustment based on OrcaSlicer output format changes
+- Profiles stored in `config/slicer_profiles/{machine,filament,process}/`
+- Machine profile: `machine/default_machine.ini` (your 3D printer config)
+- Material profiles: PLA (default), PETG, ASA in `filament/` directory
+- Process profile: `process/standard_0.2mm.ini` (print settings)
+- Symlink from existing OrcaSlicer installation recommended for easy updates
 
 ## Development vs Production
 

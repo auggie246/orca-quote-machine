@@ -1,0 +1,41 @@
+name: Lint and Format
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# Cancel in-progress runs on the same branch when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Grant permissions to only this job
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Ruff
+        run: pip install ruff==0.11.13
+
+      - name: Run Ruff Linter (with auto-fix)
+        run: ruff check --fix ./app ./tests
+
+      - name: Run Ruff Formatter
+        run: ruff format ./app ./tests
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: auto-format and lint with ruff [skip ci]"
