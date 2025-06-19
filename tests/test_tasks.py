@@ -15,7 +15,7 @@ class TestTasks:
     @patch("app.tasks.asyncio.run")
     @patch("app.tasks.validate_3d_model", None)
     @patch("app.tasks.os.path.exists", return_value=False)
-    def test_process_quote_request(self, mock_exists, mock_asyncio_run):
+    def test_process_quote_request(self, mock_exists: MagicMock, mock_asyncio_run: MagicMock) -> None:
         """Test process_quote_request task function."""
         mock_asyncio_run.return_value = {"success": True, "total_cost": 25.50}
 
@@ -35,8 +35,8 @@ class TestTasks:
     @patch("app.tasks.PricingService")
     @patch("app.tasks.TelegramService")
     async def test_run_processing_pipeline(
-        self, mock_telegram, mock_pricing, mock_slicer
-    ):
+        self, mock_telegram: MagicMock, mock_pricing: MagicMock, mock_slicer: MagicMock
+    ) -> None:
         """Test run_processing_pipeline function."""
         # Setup mocks
         mock_slicer_instance = mock_slicer.return_value
@@ -67,7 +67,7 @@ class TestTasks:
 
     @pytest.mark.asyncio
     @patch("app.tasks.TelegramService")
-    async def test_send_failure_notification(self, mock_telegram):
+    async def test_send_failure_notification(self, mock_telegram: MagicMock) -> None:
         """Test send_failure_notification function."""
         mock_telegram_instance = mock_telegram.return_value
         mock_telegram_instance.send_error_notification = AsyncMock()
@@ -78,7 +78,7 @@ class TestTasks:
         assert result is None
 
     @patch("app.tasks.Path")
-    def test_cleanup_old_files(self, mock_path):
+    def test_cleanup_old_files(self, mock_path: MagicMock) -> None:
         """Test cleanup_old_files function."""
         result = cleanup_old_files(max_age_hours=24)
 
