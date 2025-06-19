@@ -1,5 +1,6 @@
 """FastAPI application for OrcaSlicer quotation machine."""
 
+import contextlib
 import os
 import re
 import uuid
@@ -119,7 +120,7 @@ async def create_quote(
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid material. Supported: {', '.join([m.value for m in MaterialType])}",
-                )
+                ) from None
 
     # Sanitize filename to prevent path traversal
     safe_filename = secure_filename(model_file.filename)
@@ -138,7 +139,7 @@ async def create_quote(
             filename=safe_filename,
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
     # Save uploaded file with size validation during write
     file_id = str(uuid.uuid4())
@@ -164,14 +165,12 @@ async def create_quote(
     except Exception as e:
         # Clean up file if it exists
         if file_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 os.remove(file_path)
-            except:
-                pass
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save file: {str(e)}",
-        )
+        ) from e
 
     # Start background processing
     try:
@@ -195,15 +194,13 @@ async def create_quote(
 
     except Exception as e:
         # Cleanup file if task creation fails
-        try:
+        with contextlib.suppress(Exception):
             os.remove(file_path)
-        except:
-            pass
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start processing: {str(e)}",
-        )
+        ) from e
 
 
 @app.get("/health")

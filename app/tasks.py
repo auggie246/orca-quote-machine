@@ -1,6 +1,7 @@
 """Celery tasks for background processing."""
 
 import asyncio
+import contextlib
 import os
 import uuid
 from datetime import datetime
@@ -94,10 +95,8 @@ def process_quote_request(
         logger.error(f"Quote processing failed for {short_quote_id}: {error_msg}")
 
         # Send error notification
-        try:
+        with contextlib.suppress(Exception):
             asyncio.run(send_failure_notification(error_msg, short_quote_id))
-        except Exception:
-            pass  # Don't fail the task if error notification fails
 
         return {
             "success": False,

@@ -6,6 +6,8 @@ import os
 import tempfile
 from pathlib import Path
 
+import aiofiles
+
 from app.core.config import get_settings
 from app.models.quote import MaterialType, SlicingResult
 
@@ -95,7 +97,7 @@ class OrcaSlicerService:
                 discovered_materials.add(material_name)
 
         # 3. Combine, ensuring original casing is preferred, and sort.
-        all_materials = sorted(list(official_materials.union(discovered_materials)))
+        all_materials = sorted(official_materials.union(discovered_materials))
         return all_materials
 
     async def slice_model(
@@ -161,10 +163,10 @@ class OrcaSlicerService:
                 # Parse results
                 return await self._parse_slice_results(output_dir, stdout.decode())
 
-            except TimeoutError:
-                raise SlicerError("Slicing operation timed out")
+            except TimeoutError as e:
+                raise SlicerError("Slicing operation timed out") from e
             except Exception as e:
-                raise SlicerError(f"Slicing failed: {str(e)}")
+                raise SlicerError(f"Slicing failed: {str(e)}") from e
 
     async def _parse_slice_results(
         self, output_dir: Path, stdout: str
@@ -212,10 +214,11 @@ class OrcaSlicerService:
         filament_grams = 0.0
 
         try:
-            with open(gcode_path, encoding="utf-8") as f:
+            async with aiofiles.open(gcode_path, encoding="utf-8") as f:
                 # Read first 100 lines where metadata is typically located
-                for i, line in enumerate(f):
-                    if i > 100:
+                for _ in range(100):
+                    line = await f.readline()
+                    if not line:
                         break
 
                     line = line.strip()
@@ -250,8 +253,9 @@ class OrcaSlicerService:
     async def _parse_json_metadata(self, json_path: Path) -> dict | None:
         """Parse metadata from JSON output files."""
         try:
-            with open(json_path, encoding="utf-8") as f:
-                data = json.load(f)
+            async with aiofiles.open(json_path, encoding="utf-8") as f:
+                content = await f.read()
+                data = json.loads(content)
                 return data
         except Exception:
             return None
