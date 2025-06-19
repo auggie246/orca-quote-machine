@@ -60,7 +60,7 @@ def mock_orcaslicer_service(mocker: MockerFixture) -> MagicMock:
     mock_instance.slice_model.return_value = {
         "print_time_minutes": 120,  # 2 hours
         "filament_weight_grams": 25.5,
-        "layer_count": 200
+        "layer_count": 200,
     }
     return mock_instance
 
@@ -75,7 +75,7 @@ def mock_pricing_service(mocker: MockerFixture) -> MagicMock:
     mock_instance.calculate_quote.return_value = {
         "material_cost": 12.50,
         "time_cost": 15.00,
-        "total_cost": 30.25
+        "total_cost": 30.25,
     }
     return mock_instance
 
@@ -120,7 +120,7 @@ def sample_quote_data() -> dict[str, Any]:
         "name": "John Doe",
         "mobile": "+6591234567",
         "material": "PLA",
-        "color": "Red"
+        "color": "Red",
     }
 
 
@@ -131,7 +131,7 @@ def invalid_quote_data() -> dict[str, Any]:
         "name": "",  # Invalid: empty name
         "mobile": "invalid-phone",  # Invalid format
         "material": "INVALID_MATERIAL",  # Invalid material
-        "color": "A" * 100  # Invalid: too long
+        "color": "A" * 100,  # Invalid: too long
     }
 
 

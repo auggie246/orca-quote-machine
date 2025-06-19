@@ -22,7 +22,7 @@ class TestCustomValidationLogic:
         settings = Settings(
             secret_key="test-secret-key",
             allowed_extensions=["STL", "obj", ".step", "STP"],  # Mixed formats
-            _env_file=None  # Don't load .env to isolate test
+            _env_file=None,  # Don't load .env to isolate test
         )
 
         # Test OUR normalization logic - should all be lowercase with dots
@@ -33,7 +33,7 @@ class TestCustomValidationLogic:
         settings = Settings(
             secret_key="test-secret-key",
             allowed_extensions=["3MF", ".GCODE", "step"],
-            _env_file=None
+            _env_file=None,
         )
 
         # All should be normalized to lowercase with leading dots
@@ -44,7 +44,7 @@ class TestCustomValidationLogic:
         settings = Settings(
             secret_key="test-secret-key",
             slicer_profiles=None,  # Explicitly set to None
-            _env_file=None
+            _env_file=None,
         )
 
         # Test OUR initialization logic - should auto-create SlicerProfileSettings
@@ -59,7 +59,7 @@ class TestCustomValidationLogic:
         slicer_settings = SlicerProfileSettings(
             base_dir=Path("nonexistent_directory"),
             machine="missing_machine.json",
-            process="missing_process.json"
+            process="missing_process.json",
         )
 
         # Should succeed because our logic skips validation in test environment
@@ -84,9 +84,7 @@ class TestCustomValidationLogic:
             patch.dict(os.environ, {}, clear=True),
             pytest.raises(ValueError, match="profile not found"),
         ):
-            SlicerProfileSettings(
-                base_dir=Path("definitely_nonexistent_directory")
-            )
+            SlicerProfileSettings(base_dir=Path("definitely_nonexistent_directory"))
 
 
 class TestConfigurationBehavior:
@@ -96,7 +94,7 @@ class TestConfigurationBehavior:
         """Test that Settings can be created with minimal required config."""
         settings = Settings(
             secret_key="test-secret-key",
-            _env_file=None  # Don't load .env to test true defaults
+            _env_file=None,  # Don't load .env to test true defaults
         )
 
         # Should succeed and have reasonable defaults
@@ -135,7 +133,7 @@ class TestConfigurationBehavior:
         env_vars = {
             "SECRET_KEY": "test-secret-key",
             "SLICER_PROFILES__BASE_DIR": "custom/profiles/path",
-            "SLICER_PROFILES__MACHINE": "custom_machine.json"
+            "SLICER_PROFILES__MACHINE": "custom_machine.json",
         }
 
         with patch.dict(os.environ, env_vars):
@@ -155,7 +153,7 @@ class TestSlicerProfileSettings:
             slicer_settings = SlicerProfileSettings(
                 base_dir=Path("/custom/path"),
                 machine="my_machine.json",
-                filament_pla="my_pla.json"
+                filament_pla="my_pla.json",
             )
 
             # Test that our path logic works correctly
@@ -174,4 +172,3 @@ class TestSlicerProfileSettings:
             assert slicer_settings.filament_pla == "pla.json"
             assert slicer_settings.filament_petg == "petg.json"
             assert slicer_settings.filament_asa == "asa.json"
-
