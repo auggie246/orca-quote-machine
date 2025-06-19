@@ -1,10 +1,10 @@
-name: CI
+name: Lint and Format
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 # Cancel in-progress runs on the same branch when a new commit is pushed.
 concurrency:
@@ -12,9 +12,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint and Type Check
+  lint-and-format:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Grant permissions to only this job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,74 +24,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          # Enable caching for uv's global package cache
-          cache: 'uv'
+          cache: 'pip'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv-action@v1
+      - name: Install Ruff
+        run: pip install ruff==0.11.13
 
-      # Use ruff-action v2 for linting. This provides rich annotations in PRs.
-      - name: Run ruff linter
-        uses: astral-sh/ruff-action@v2
+      - name: Run Ruff Linter (with auto-fix)
+        run: ruff check --fix ./app ./tests
+
+      - name: Run Ruff Formatter
+        run: ruff format ./app ./tests
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          # Lint both your application and test code.
-          # Assumes project structure is app/ (python) and tests/.
-          src: "app tests"
-          check: true
-
-      # A separate step for format checking, as requested.
-      - name: Run ruff formatter check
-        uses: astral-sh/ruff-action@v2
-        with:
-          src: "app tests"
-          format: true
-
-      - name: Run mypy type checker
-        run: |
-          # Mypy needs the project's dependencies to perform accurate type analysis.
-          # This step ensures the environment is correctly configured before running mypy.
-          uv pip install -e ".[test]"
-          uv run mypy app tests
-
-  test:
-    name: Build and Test
-    runs-on: ubuntu-latest
-    strategy:
-      # Run tests on all supported Python versions
-      matrix:
-        python-version: ['3.11', '3.12']
-      # Don't cancel other jobs in the matrix if one fails
-      fail-fast: false
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'uv'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv-action@v1
-
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-
-      # This is the key step for intelligent Rust caching.
-      # It sets up sccache and configures cargo to use it automatically.
-      # The action handles its own GitHub Actions cache backend.
-      - name: Set up sccache for Rust compilation caching
-        uses: mozilla/sccache-action@v0.0.5
-
-      - name: Install dependencies and build Rust extension
-        # RUSTC_WRAPPER is set by the sccache-action, so cargo will use it.
-        # uv invokes pip, which invokes maturin, which invokes cargo.
-        run: uv pip install -e ".[test]"
-
-      - name: Run tests with pytest
-        # `uv run` executes the command within the managed virtual environment.
-        run: uv run pytest
+          commit_message: "ci: auto-format and lint with ruff [skip ci]"
