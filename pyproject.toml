@@ -105,7 +105,6 @@ select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "ANN", "ASYNC", "TID"]
 # Ignore rules that are incompatible with common FastAPI/Pydantic patterns.
 ignore = [
     "B008",    # FastAPI's Depends() uses function calls in argument defaults.
-    "ANN101",  # Missing type annotation for `self` can be noisy. Can be enabled later for stricter checks.
     "ANN401",  # Allow `typing.Any` for now. Can be removed for a very strict policy.
 ]
 
