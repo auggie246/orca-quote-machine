@@ -44,8 +44,8 @@ class OrcaSlicerService:
             return profile_path
 
         # 2. Fallback to file-based convention for custom materials.
-        # Convention: material name 'TPU' maps to `tpu.ini`.
-        conventional_filename = f"{material_lower}.ini"
+        # Convention: material name 'TPU' maps to `tpu.json`.
+        conventional_filename = f"{material_lower}.json"
         profile_path = self.filament_profiles_dir / conventional_filename
         if profile_path.exists():
             return profile_path
@@ -81,16 +81,16 @@ class OrcaSlicerService:
         """
         Discovers all available materials for populating UI elements.
         Combines official materials from the enum with custom materials
-        found as .ini files in the filament profile directory.
+        found as .json files in the filament profile directory.
         """
         # 1. Start with official materials from the enum
         official_materials = {m.value for m in MaterialType}
 
-        # 2. Scan the filesystem for all .ini files
+        # 2. Scan the filesystem for all .json files
         discovered_materials = set()
         if self.filament_profiles_dir.is_dir():
-            for f in self.filament_profiles_dir.glob("*.ini"):
-                # Convert 'generic_tpu.ini' -> 'generic_tpu'
+            for f in self.filament_profiles_dir.glob("*.json"):
+                # Convert 'generic_tpu.json' -> 'generic_tpu'
                 material_name = f.stem.upper()  # Convert to uppercase for consistency
                 discovered_materials.add(material_name)
 
