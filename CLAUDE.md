@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Claude Code Configuration
+
+**Operational Mode**: `pro_collaborator` - Uses advanced thinking, proactive checks, and domain expertise
+**Model Preference**: `pro` for code changes and complex analysis
+**Proactive Checks**: Enabled for architectural pattern enforcement and error prevention
+
 ## Development Commands
 
 **Essential Commands:**
@@ -28,6 +34,39 @@ redis-cli ping                 # Verify Redis connection
 - Use `maturin develop` to rebuild Rust components after changes
 - Redis must be running before starting workers or web server
 
+## Dependency Management
+
+**Python Dependencies (uv):**
+- **Core Dependencies**: Listed in `[project.dependencies]` for runtime requirements
+- **Development Dependencies**: Use `[dependency-groups.dev]` for dev tools (pytest, ruff, mypy)
+- **Version Pinning**: Pin exact versions for dev tools (e.g., `ruff==0.11.13`) for consistency
+- **Version Ranges**: Use compatible ranges for runtime deps (e.g., `fastapi>=0.104.0`)
+
+**Dependency Commands:**
+```bash
+uv sync --group dev              # Install all dependencies including dev group
+uv add package_name              # Add new runtime dependency
+uv add --group dev package_name  # Add new dev dependency
+uv lock                          # Update lock file with latest compatible versions
+uv sync --frozen                 # Install exact versions from lock file (CI/prod)
+```
+
+**Rust Dependencies (Cargo.toml):**
+- **PyO3 Integration**: Rust dependencies managed separately via `src/Cargo.toml`
+- **Rebuild Required**: Run `maturin develop` after Rust dependency changes
+- **Version Compatibility**: Ensure PyO3 version matches Python version requirements
+
+**Update Strategy:**
+- **Regular Updates**: Monthly dependency updates with full test suite validation
+- **Security Updates**: Immediate updates for security vulnerabilities
+- **Breaking Changes**: Test thoroughly with integration tests before updating major versions
+- **Lock File**: Commit `uv.lock` to ensure reproducible builds across environments
+
+**Multi-Language Coordination:**
+- **Python-Rust Boundary**: Changes to PyO3 bindings require rebuilding both sides
+- **Development Workflow**: Always run `maturin develop` after pulling Rust changes
+- **CI/CD**: Build pipeline handles both Python and Rust dependency installation
+
 ## System Architecture
 
 **Core Processing Pipeline:**
@@ -46,6 +85,50 @@ OrcaSlicer CLI → G-code Parsing → Pricing → Telegram Notification
 - FastAPI routes use chunked file reading (8KB chunks) to prevent memory DoS
 - Celery tasks use `asyncio.run()` to execute async service calls
 - All external calls (OrcaSlicer CLI, Telegram API) are properly awaited
+
+## Architectural Patterns
+
+### 1. API Task Offload Pattern
+**Use Case**: Long-running operations (slicing, complex calculations)
+**Implementation**:
+1. **FastAPI Endpoint**: Receives request, validates input, saves file
+2. **Celery Task**: Enqueued with file identifier, handles processing
+3. **Status Endpoint**: Polling endpoint for task progress/results
+4. **Response Flow**: Immediate 202 Accepted → Background processing → Status polling
+
+**Key Requirements**:
+- Use `secure_filename()` for all user-provided filenames
+- Return task ID immediately, process asynchronously
+- Implement proper file cleanup in `finally` blocks
+- Handle timeouts gracefully (OrcaSlicer default: 5 minutes)
+
+### 2. Rust Calculation Pattern  
+**Use Case**: CPU-bound operations (mesh analysis, geometric calculations)
+**Implementation**:
+1. **Rust Function**: Core logic with `std::panic::catch_unwind`
+2. **PyO3 Binding**: `#[pyfunction]` decorator with proper error translation
+3. **Python Wrapper**: Exception handling for Rust panics
+4. **Execution Context**: Called from Celery tasks or `run_in_executor`
+
+**Safety Requirements**:
+- Always wrap Rust calls in try/except blocks
+- Use `BufReader` for streaming large file operations
+- Validate input data before passing to Rust
+- Handle memory allocation failures gracefully
+
+### 3. External CLI Integration Pattern
+**Use Case**: OrcaSlicer subprocess execution
+**Implementation**:
+1. **Command Validation**: Verify CLI path and arguments
+2. **Timeout Protection**: Set reasonable limits (default 5 minutes)
+3. **Output Parsing**: Handle G-code comments and metadata
+4. **Error Recovery**: Graceful fallback for CLI failures
+
+**Security Requirements**:
+- Validate all CLI arguments against known patterns
+- Use absolute paths for executables
+- Sanitize file paths to prevent injection
+- Monitor resource usage during execution
 
 ## Configuration Management
 
@@ -131,6 +214,55 @@ minimum = S$5.00
 
 **Currency**: All prices in Singapore Dollars (SGD), formatted as `S$X.XX`
 
+## Code Quality & Linting
+
+**Ruff Configuration (`pyproject.toml`):**
+- **Rule Selection**: Current ruleset balances strictness with FastAPI/async patterns
+- **Selected Rules**: `E/F` (core), `W` (warnings), `I` (imports), `UP` (modernize), `B` (bugs), `C4` (comprehensions), `SIM` (simplify), `ANN` (annotations), `ASYNC` (async patterns), `TID` (imports)
+- **Ignored Rules**: `B008` (FastAPI Depends pattern), `ANN401` (allows typing.Any)
+
+**Configuration Management:**
+- **Version Pinning**: Ruff version pinned to `0.11.13` in dependencies for consistency
+- **Rule Updates**: When updating ruff versions, check for deprecated rules with `uv run ruff check --show-settings`
+- **Deprecated Rules**: Remove deprecated rules from config immediately (e.g., `ANN101` removed in ruff 0.5+)
+
+**Quality Enforcement:**
+- **Pre-commit**: Always run `./scripts/format.sh` before committing
+- **CI Integration**: All linting must pass in GitHub Actions
+- **Type Checking**: MyPy configured for strict type checking with `disallow_untyped_defs`
+
+**Rule Modification Process:**
+1. Test rule changes locally with `uv run ruff check app tests`
+2. Verify formatting compatibility with `uv run ruff format app tests`
+3. Update CI if adding new rule categories
+4. Document rationale for ignored rules in pyproject.toml comments
+
+## Code Review Checklist
+
+**CRITICAL - Must Fix Before Merge:**
+- [ ] **BLOCKING_IO_IN_ASYNC_ROUTE**: No blocking I/O in FastAPI async routes (use Celery or `run_in_executor`)
+- [ ] **UNHANDLED_RUST_PANIC**: All Rust function calls wrapped in try/except blocks
+- [ ] **MISSING_FILE_CLEANUP**: File operations have cleanup in `finally` blocks
+- [ ] **ASYNC_SYNC_BOUNDARY_VIOLATION**: Proper async/sync coordination patterns
+
+**HIGH PRIORITY - Address Before Production:**
+- [ ] **INCORRECT_ORCASLICER_CALL**: OrcaSlicer CLI arguments validated against documentation
+- [ ] **MISSING_INPUT_VALIDATION**: All user inputs validated through Pydantic models
+- [ ] **INSECURE_FILENAME_HANDLING**: `secure_filename()` applied to user-provided names
+- [ ] **MISSING_TIMEOUT_PROTECTION**: External calls have reasonable timeout limits
+
+**MEDIUM PRIORITY - Code Quality:**
+- [ ] **MISSING_CELERY_IDEMPOTENCY**: Tasks can be safely re-executed
+- [ ] **INCONSISTENT_ERROR_HANDLING**: Uniform error patterns across similar operations
+- [ ] **MISSING_STRUCTURED_LOGGING**: Context included in log messages for async operations
+- [ ] **PERFORMANCE_ANTIPATTERNS**: No unnecessary blocking operations or resource leaks
+
+**Automated Checks:**
+- All ruff linting rules pass
+- MyPy type checking without errors  
+- Test coverage maintained above 80%
+- No security vulnerabilities in dependencies
+
 ## Common Issues and Patterns
 
 **Memory Management:**
@@ -138,12 +270,100 @@ minimum = S$5.00
 - Python file operations use chunked reading
 - OrcaSlicer timeout protection (default 5 minutes)
 
-**Error Handling:**
+**Error Handling Patterns:**
 - Rust components have graceful fallback when unavailable
 - Telegram notifications have error capture for debugging
 - File cleanup always happens in finally blocks
+- Use structured logging with context for async operations
+- Wrap external CLI calls with timeout and proper error capture
+
+**Debugging Async/Celery Issues:**
+```bash
+# Check Celery worker status and active tasks
+uv run celery -A app.tasks inspect active
+uv run celery -A app.tasks inspect stats
+
+# Debug worker with verbose logging
+uv run celery -A app.tasks worker --loglevel=debug --concurrency=1
+
+# Monitor task execution in real-time
+uv run celery -A app.tasks events
+
+# Clear failed tasks from queue
+uv run celery -A app.tasks purge
+```
+
+**Common OrcaSlicer Problems:**
+- **CLI Not Found**: Verify `ORCASLICER_CLI_PATH` in environment
+- **Profile Missing**: Check `SLICER_PROFILES_DIR` contains machine/, filament/, process/ subdirs
+- **Timeout Issues**: Increase timeout for large/complex models
+- **Permission Errors**: Ensure OrcaSlicer executable has proper permissions
+- **Memory Issues**: Monitor system memory during slicing of large files
+
+**Redis Connection Troubleshooting:**
+```bash
+# Test Redis connectivity
+redis-cli ping                    # Should return PONG
+redis-cli info replication       # Check Redis server info
+
+# Monitor Redis operations
+redis-cli monitor                 # Real-time command monitoring
+redis-cli --latency              # Check connection latency
+
+# Check Celery broker connection
+uv run python -c "from app.tasks import app; print(app.control.inspect().stats())"
+```
+
+**File Upload Error Patterns:**
+- **Large File Timeout**: Increase nginx `client_max_body_size` and timeout settings
+- **Invalid File Type**: Check file validation in Rust layer logs
+- **Path Traversal**: Verify `secure_filename()` is applied to all user inputs
+- **Disk Space**: Monitor available disk space in upload directory
+- **Async Upload Issues**: Check for proper await patterns in FastAPI routes
+
+**Performance Debugging:**
+```bash
+# Profile async operations
+uv run python -m cProfile -s cumulative app/main.py
+
+# Monitor Celery task performance
+uv run celery -A app.tasks inspect active_queues
+uv run celery -A app.tasks inspect reserved
+
+# Check system resources during processing
+htop                              # CPU and memory usage
+iostat -x 1                      # Disk I/O monitoring
+```
 
 **Testing Strategy:**
 - Mock OrcaSlicer CLI for unit tests (avoid actual slicing)
 - Test Rust validation with sample STL/OBJ/STEP files
 - Integration tests should verify complete pipeline without external dependencies
+- Use pytest fixtures for Redis and Celery test isolation
+- Test error scenarios: file corruption, CLI failures, network timeouts
+
+## Claude Behavior Guidelines
+
+**Response Quality Standards:**
+- Use `pro` model and `high` thinking mode for complex architectural decisions
+- Always provide contextual explanations specific to this 3D printing system
+- Include relevant file paths and line numbers when referencing code
+- Proactively check for architectural antipatterns before suggesting solutions
+
+**Code Generation Patterns:**
+- Follow established architectural patterns (API Task Offload, Rust Calculation, CLI Integration)
+- Include proper error handling and resource cleanup in all generated code
+- Generate complete, testable implementations rather than partial snippets
+- Validate external tool usage (OrcaSlicer CLI) against current documentation
+
+**Proactive Error Detection:**
+- Check for blocking I/O in async contexts before suggesting FastAPI routes
+- Ensure Rust integration follows PyO3 safety patterns
+- Verify file handling includes proper cleanup mechanisms
+- Validate Celery task patterns for idempotency and error recovery
+
+**Domain Expertise Application:**
+- Understand 3D printing workflow: STL → Slicing → G-code → Analysis
+- Know OrcaSlicer CLI patterns and common failure modes
+- Recognize material-specific processing requirements (PLA, PETG, ASA)
+- Apply security best practices for file upload and processing systems
