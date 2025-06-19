@@ -175,7 +175,7 @@ async def create_quote(
     # Start background processing
     try:
         task = process_quote_request.delay(
-            file_path=str(file_path), quote_data=quote_request.dict(), material=material
+            file_path=str(file_path), quote_data=quote_request.model_dump(), material=material
         )
 
         return JSONResponse(

@@ -86,9 +86,9 @@ TELEGRAM_ADMIN_CHAT_ID=                      # Where quotes are sent
 
 **Profile Management:**
 - Profiles stored in `config/slicer_profiles/{machine,filament,process}/`
-- Machine profile: `machine/default_machine.ini` (your 3D printer config)
+- Machine profile: `machine/default_machine.json` (your 3D printer config)
 - Material profiles: PLA (default), PETG, ASA in `filament/` directory
-- Process profile: `process/standard_0.2mm.ini` (print settings)
+- Process profile: `process/standard_0.2mm.json` (print settings)
 - Symlink from existing OrcaSlicer installation recommended for easy updates
 
 ## Development vs Production

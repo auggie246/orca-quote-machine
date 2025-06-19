@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 
 
 class MaterialType(str, Enum):
@@ -33,8 +33,9 @@ class QuoteRequest(BaseModel):
     color: str | None = Field(None, max_length=50)
     filename: str = Field(..., min_length=1)
 
-    @validator("mobile")
-    def validate_mobile(cls, v):
+    @field_validator("mobile")
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
         """Validate mobile number format."""
         # Remove spaces and common separators
         clean_mobile = re.sub(r"[\s\-\(\)]+", "", v)
@@ -45,8 +46,9 @@ class QuoteRequest(BaseModel):
 
         return clean_mobile
 
-    @validator("name")
-    def validate_name(cls, v):
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
         """Validate name contains only allowed characters."""
         if not re.match(r"^[a-zA-Z\s\-\.]+$", v.strip()):
             raise ValueError("Name contains invalid characters")
@@ -73,7 +75,6 @@ class QuoteResponse(BaseModel):
     filename: str
 
     # Slicing results
-    print_time_hours: float
     print_time_minutes: int
     filament_weight_grams: float
 
@@ -87,12 +88,11 @@ class QuoteResponse(BaseModel):
     created_at: datetime
     processed_at: datetime | None = None
 
-    @validator("print_time_hours", pre=True)
-    def calculate_hours(cls, v, values):
-        """Calculate hours from minutes if not provided."""
-        if "print_time_minutes" in values:
-            return values["print_time_minutes"] / 60.0
-        return v
+    @computed_field
+    @property
+    def print_time_hours(self) -> float:
+        """Calculate hours from minutes."""
+        return self.print_time_minutes / 60.0
 
 
 class TelegramMessage(BaseModel):
