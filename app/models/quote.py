@@ -35,7 +35,7 @@ class QuoteRequest(BaseModel):
 
     @field_validator("mobile")
     @classmethod
-    def validate_mobile(cls, v: str) -> str:
+    def validate_mobile(cls: type["QuoteRequest"], v: str) -> str:
         """Validate mobile number format."""
         # Remove spaces and common separators
         clean_mobile = re.sub(r"[\s\-\(\)]+", "", v)
@@ -48,7 +48,7 @@ class QuoteRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v: str) -> str:
+    def validate_name(cls: type["QuoteRequest"], v: str) -> str:
         """Validate name contains only allowed characters."""
         if not re.match(r"^[a-zA-Z\s\-\.]+$", v.strip()):
             raise ValueError("Name contains invalid characters")
@@ -90,7 +90,7 @@ class QuoteResponse(BaseModel):
 
     @computed_field
     @property
-    def print_time_hours(self) -> float:
+    def print_time_hours(self: "QuoteResponse") -> float:
         """Calculate hours from minutes."""
         return self.print_time_minutes / 60.0
 
@@ -108,17 +108,17 @@ class TelegramMessage(BaseModel):
     filament_weight: str
     total_cost: float
 
-    def format_message(self) -> str:
+    def format_message(self: "TelegramMessage") -> str:
         """Format message for Telegram."""
-        material_info = f" ({self.material})" if self.material else ""
+        material_display = self.material or "PLA (default)"
         color_info = f" - {self.color}" if self.color else ""
 
         return f"""New Quote Request #{self.quote_id}
-        
+
 Customer: {self.customer_name}
 WhatsApp: {self.customer_mobile}
 File: {self.filename}
-Material: {self.material or "PLA (default)"}{color_info}
+Material: {material_display}{color_info}
 
 Print Time: {self.print_time}
 Filament: {self.filament_weight}

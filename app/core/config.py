@@ -23,8 +23,8 @@ class SlicerProfileSettings(BaseModel):
     filament_petg: str = "petg.json"
     filament_asa: str = "asa.json"
 
-    @model_validator(mode='after')
-    def validate_profiles_exist(self) -> 'SlicerProfileSettings':
+    @model_validator(mode="after")
+    def validate_profiles_exist(self) -> "SlicerProfileSettings":
         """Validate that all configured profile files exist."""
         profiles_to_check = [
             ("machine", self.machine),
@@ -98,9 +98,9 @@ class Settings(BaseSettings):
 
     @field_validator("upload_dir")
     @classmethod
-    def validate_upload_dir(cls, dir_path: str) -> str:
+    def validate_upload_dir(cls: type["Settings"], dir_path: str) -> str:
         """Validate the upload directory path.
-        
+
         Note: Directory creation is handled during application startup,
         not during configuration validation.
         """
@@ -108,9 +108,12 @@ class Settings(BaseSettings):
 
     @field_validator("allowed_extensions")
     @classmethod
-    def normalize_extensions(cls, extensions: list[str]) -> list[str]:
+    def normalize_extensions(cls: type["Settings"], extensions: list[str]) -> list[str]:
         """Normalize file extensions to lowercase with dots."""
-        return [ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in extensions]
+        return [
+            ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+            for ext in extensions
+        ]
 
 
 @lru_cache

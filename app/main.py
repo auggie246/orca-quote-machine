@@ -4,12 +4,13 @@ import os
 import re
 import uuid
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.templating import Jinja2Templates, TemplateResponse
 
 from app.core.config import get_settings
 from app.models.quote import MaterialType, QuoteRequest
@@ -53,7 +54,7 @@ def secure_filename(filename: str) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+async def home(request: Request) -> TemplateResponse:
     """Home page with quote request form."""
     # Get available materials from slicer service (includes custom materials)
     try:
@@ -81,7 +82,7 @@ async def create_quote(
     material: str | None = Form(None),
     color: str | None = Form(None, max_length=50),
     model_file: UploadFile = File(...),
-):
+) -> JSONResponse:
     """
     Create a new quote request.
 
@@ -175,7 +176,9 @@ async def create_quote(
     # Start background processing
     try:
         task = process_quote_request.delay(
-            file_path=str(file_path), quote_data=quote_request.model_dump(), material=material
+            file_path=str(file_path),
+            quote_data=quote_request.model_dump(),
+            material=material,
         )
 
         return JSONResponse(
@@ -204,13 +207,13 @@ async def create_quote(
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy", "app_name": settings.app_name, "version": "0.1.0"}
 
 
 @app.get("/status/{task_id}")
-async def get_task_status(task_id: str):
+async def get_task_status(task_id: str) -> dict[str, Any]:
     """Get the status of a background task."""
     task_result = celery_app.AsyncResult(task_id)
 
