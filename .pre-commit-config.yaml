@@ -1,0 +1,48 @@
+# .pre-commit-config.yaml
+
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+# Define the minimum version of pre-commit required
+minimum_pre_commit_version: "3.0.0"
+
+repos:
+  # Standard hooks for file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  # Ruff pre-commit hooks (replaces black, isort, and many flake8 plugins)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Use a recent, stable version of ruff.
+    rev: v0.4.4
+    hooks:
+      # 1. Run the linter, with auto-fixing enabled.
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      # 2. Run the formatter.
+      - id: ruff-format
+
+  # Mypy pre-commit hook for static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        # Mypy needs your project's dependencies to run correctly.
+        # This list should be kept in sync with your `pyproject.toml`.
+        # The '.' installs the local project itself.
+        additional_dependencies:
+          - "fastapi"
+          - "pydantic"
+          - "celery"
+          - "pytest"
+          - "httpx"
+          - "."
+        # Point mypy to the same directories we check in CI.
+        args: ["--config-file=pyproject.toml", "app", "tests"]
