@@ -128,6 +128,7 @@
       "allow": [
         "mcp__zen__thinkdeep",
         "mcp__zen__codereview",
+
         "mcp__zen__debug",
         "mcp__zen__analyze",
         "mcp__zen__chat",
