@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use std::fs;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use thiserror::Error;
 

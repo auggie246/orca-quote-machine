@@ -38,7 +38,7 @@ class QuoteRequest(BaseModel):
     def validate_mobile(cls: type["QuoteRequest"], v: str) -> str:
         """Validate mobile number format."""
         # Remove spaces and common separators
-        clean_mobile = re.sub(r"[\s\-\(\)]+", "", v)
+        clean_mobile = re.sub(r"[\s\-\(\)\.]+", "", v)
 
         # Check if it's a valid phone number (basic validation)
         if not re.match(r"^\+?[\d]{8,15}$", clean_mobile):
@@ -50,9 +50,16 @@ class QuoteRequest(BaseModel):
     @classmethod
     def validate_name(cls: type["QuoteRequest"], v: str) -> str:
         """Validate name contains only allowed characters."""
-        if not re.match(r"^[\w\s\-\.']+$", v.strip(), re.UNICODE):
+        # Check if empty after stripping
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Name cannot be empty")
+
+        # Reject names with numbers or most special characters
+        # Allow letters (including Unicode), spaces, hyphens, dots, apostrophes
+        if re.search(r"[\d@#$%^&*()+=\[\]{}|\\:;\"<>?/~`]", stripped):
             raise ValueError("Name contains invalid characters")
-        return v.strip()
+        return stripped
 
 
 class SlicingResult(BaseModel):

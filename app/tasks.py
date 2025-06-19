@@ -19,7 +19,7 @@ from app.services.telegram import TelegramService
 
 # Import Rust validation functions
 try:
-    from orca_quote_machine._rust_core import validate_3d_model
+    from _rust_core import validate_3d_model
 except ImportError:
     print(
         "Warning: Rust validation module not available. Install with 'maturin develop'"
