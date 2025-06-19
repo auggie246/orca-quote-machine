@@ -1,15 +1,19 @@
 """FastAPI application for OrcaSlicer quotation machine."""
 
+import contextlib
 import os
 import re
 import uuid
 from pathlib import Path
+from typing import Any
 
 import aiofiles
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
+                     status)
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.responses import Response
 
 from app.core.config import get_settings
 from app.models.quote import MaterialType, QuoteRequest
@@ -53,7 +57,7 @@ def secure_filename(filename: str) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+async def home(request: Request) -> Response:
     """Home page with quote request form."""
     # Get available materials from slicer service (includes custom materials)
     try:
@@ -81,7 +85,7 @@ async def create_quote(
     material: str | None = Form(None),
     color: str | None = Form(None, max_length=50),
     model_file: UploadFile = File(...),
-):
+) -> JSONResponse:
     """
     Create a new quote request.
 
@@ -118,7 +122,7 @@ async def create_quote(
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid material. Supported: {', '.join([m.value for m in MaterialType])}",
-                )
+                ) from None
 
     # Sanitize filename to prevent path traversal
     safe_filename = secure_filename(model_file.filename)
@@ -137,7 +141,9 @@ async def create_quote(
             filename=safe_filename,
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
 
     # Save uploaded file with size validation during write
     file_id = str(uuid.uuid4())
@@ -163,19 +169,19 @@ async def create_quote(
     except Exception as e:
         # Clean up file if it exists
         if file_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 os.remove(file_path)
-            except:
-                pass
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save file: {str(e)}",
-        )
+        ) from e
 
     # Start background processing
     try:
         task = process_quote_request.delay(
-            file_path=str(file_path), quote_data=quote_request.model_dump(), material=material
+            file_path=str(file_path),
+            quote_data=quote_request.model_dump(),
+            material=material,
         )
 
         return JSONResponse(
@@ -192,25 +198,23 @@ async def create_quote(
 
     except Exception as e:
         # Cleanup file if task creation fails
-        try:
+        with contextlib.suppress(Exception):
             os.remove(file_path)
-        except:
-            pass
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to start processing: {str(e)}",
-        )
+        ) from e
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy", "app_name": settings.app_name, "version": "0.1.0"}
 
 
 @app.get("/status/{task_id}")
-async def get_task_status(task_id: str):
+async def get_task_status(task_id: str) -> dict[str, Any]:
     """Get the status of a background task."""
     task_result = celery_app.AsyncResult(task_id)
 

@@ -126,6 +126,10 @@ known-first-party = ["app"]
 quote-style = "double"
 line-ending = "lf"
 
+[tool.ruff.lint.pycodestyle]
+# Set line length to 120 characters instead of default 88
+max-line-length = 120
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"

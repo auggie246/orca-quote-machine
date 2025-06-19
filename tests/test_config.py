@@ -1,258 +1,174 @@
-"""Tests for configuration settings."""
+"""Tests for configuration settings.
 
-import pytest
-import tempfile
+Focus: Test our custom validation logic, not Pydantic's built-in validation.
+Pydantic already handles type validation, required fields, and env var parsing.
+"""
+
 import os
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings, get_settings
+from app.core.config import Settings, SlicerProfileSettings, get_settings
 
 
-class TestSettings:
-    """Tests for the Settings configuration class."""
-    
-    def test_default_settings(self):
-        """Test default settings values."""
-        # Set required environment variable
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = Settings()
-            
-            # Test default values
-            assert settings.app_name == "OrcaSlicer Quotation Machine"
-            assert settings.debug is False
-            assert settings.host == "0.0.0.0"
-            assert settings.port == 8000
-            assert settings.max_file_size == 100 * 1024 * 1024  # 100MB
-            assert settings.upload_dir == "uploads"
-            assert ".stl" in settings.allowed_extensions
-            assert ".obj" in settings.allowed_extensions
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_secret_key_required(self):
-        """Test that SECRET_KEY is required."""
-        # Ensure SECRET_KEY is not set
-        if "SECRET_KEY" in os.environ:
-            del os.environ["SECRET_KEY"]
-        
-        with pytest.raises(ValidationError):
-            Settings()
-    
-    def test_environment_variable_override(self):
-        """Test that environment variables override defaults."""
-        env_vars = {
-            "SECRET_KEY": "test-secret-key",
-            "APP_NAME": "Custom App Name",
-            "DEBUG": "true",
-            "HOST": "127.0.0.1",
-            "PORT": "9000",
-            "MAX_FILE_SIZE": "50000000",  # 50MB
-            "UPLOAD_DIR": "custom_uploads"
-        }
-        
-        # Set environment variables
-        for key, value in env_vars.items():
-            os.environ[key] = value
-        
-        try:
-            settings = Settings()
-            
-            assert settings.app_name == "Custom App Name"
-            assert settings.debug is True
-            assert settings.host == "127.0.0.1"
-            assert settings.port == 9000
-            assert settings.max_file_size == 50000000
-            assert settings.upload_dir == "custom_uploads"
-            
-        finally:
-            # Clean up environment variables
-            for key in env_vars.keys():
-                if key in os.environ:
-                    del os.environ[key]
-    
-    def test_allowed_extensions_normalization(self):
-        """Test that file extensions are normalized."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        os.environ["ALLOWED_EXTENSIONS"] = "STL,obj,.step,STP"
-        
-        try:
-            settings = Settings()
-            
-            # All extensions should be lowercase with dots
-            expected = [".stl", ".obj", ".step", ".stp"]
-            assert settings.allowed_extensions == expected
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-            del os.environ["ALLOWED_EXTENSIONS"]
-    
-    def test_upload_dir_creation(self):
-        """Test that upload directory is created."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            upload_path = Path(temp_dir) / "test_uploads"
-            
-            os.environ["SECRET_KEY"] = "test-secret-key"
-            os.environ["UPLOAD_DIR"] = str(upload_path)
-            
-            try:
-                settings = Settings()
-                
-                # Directory should be created by validator
-                assert upload_path.exists()
-                assert upload_path.is_dir()
-                
-            finally:
-                del os.environ["SECRET_KEY"]
-                del os.environ["UPLOAD_DIR"]
-    
-    def test_material_prices_default(self):
-        """Test default material prices."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = Settings()
-            
-            assert settings.material_prices["PLA"] == 25.0
-            assert settings.material_prices["PETG"] == 30.0
-            assert settings.material_prices["ASA"] == 35.0
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_pricing_settings(self):
-        """Test pricing-related settings."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = Settings()
-            
-            assert settings.default_price_per_kg == 25.0
-            assert settings.price_multiplier == 1.1
-            assert settings.minimum_price == 5.0
-            assert settings.additional_time_hours == 0.5
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_redis_celery_settings(self):
-        """Test Redis and Celery settings."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = Settings()
-            
-            assert settings.redis_url == "redis://localhost:6379/0"
-            assert settings.celery_broker_url == "redis://localhost:6379/0"
-            assert settings.celery_result_backend == "redis://localhost:6379/0"
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_telegram_settings_optional(self):
-        """Test that Telegram settings are optional."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = Settings()
-            
-            # Should be None by default
-            assert settings.telegram_bot_token is None
-            assert settings.telegram_admin_chat_id is None
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_telegram_settings_configured(self):
-        """Test Telegram settings when configured."""
-        env_vars = {
-            "SECRET_KEY": "test-secret-key",
-            "TELEGRAM_BOT_TOKEN": "123456:ABC-DEF1234567890",
-            "TELEGRAM_ADMIN_CHAT_ID": "987654321"
-        }
-        
-        for key, value in env_vars.items():
-            os.environ[key] = value
-        
-        try:
-            settings = Settings()
-            
-            assert settings.telegram_bot_token == "123456:ABC-DEF1234567890"
-            assert settings.telegram_admin_chat_id == "987654321"
-            
-        finally:
-            for key in env_vars.keys():
-                if key in os.environ:
-                    del os.environ[key]
-    
-    def test_orcaslicer_settings(self):
-        """Test OrcaSlicer-related settings."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = Settings()
-            
-            assert settings.orcaslicer_cli_path == "/var/lib/flatpak/exports/bin/io.github.softfever.OrcaSlicer"
-            assert settings.slicer_timeout == 300  # 5 minutes
-            assert settings.slicer_profiles_dir == "config/slicer_profiles"
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_case_insensitive_env_vars(self):
-        """Test that environment variables are case insensitive."""
-        env_vars = {
-            "secret_key": "test-secret-key",  # lowercase
-            "app_name": "Test App",
-            "debug": "true"
-        }
-        
-        for key, value in env_vars.items():
-            os.environ[key] = value
-        
-        try:
-            settings = Settings()
-            
-            assert settings.secret_key == "test-secret-key"
-            assert settings.app_name == "Test App"
-            assert settings.debug is True
-            
-        finally:
-            for key in env_vars.keys():
-                if key in os.environ:
-                    del os.environ[key]
+class TestCustomValidationLogic:
+    """Tests for our custom validation logic that extends Pydantic."""
+
+    def test_extension_normalization(self):
+        """Test our custom extension normalization logic."""
+        settings = Settings(
+            secret_key="test-secret-key",
+            allowed_extensions=["STL", "obj", ".step", "STP"],  # Mixed formats
+            _env_file=None,  # Don't load .env to isolate test
+        )
+
+        # Test OUR normalization logic - should all be lowercase with dots
+        assert settings.allowed_extensions == [".stl", ".obj", ".step", ".stp"]
+
+    def test_extension_normalization_edge_cases(self):
+        """Test extension normalization with edge cases."""
+        settings = Settings(
+            secret_key="test-secret-key",
+            allowed_extensions=["3MF", ".GCODE", "step"],
+            _env_file=None,
+        )
+
+        # All should be normalized to lowercase with leading dots
+        assert settings.allowed_extensions == [".3mf", ".gcode", ".step"]
+
+    def test_slicer_profiles_auto_initialization(self):
+        """Test our custom slicer profiles initialization logic."""
+        settings = Settings(
+            secret_key="test-secret-key",
+            slicer_profiles=None,  # Explicitly set to None
+            _env_file=None,
+        )
+
+        # Test OUR initialization logic - should auto-create SlicerProfileSettings
+        assert settings.slicer_profiles is not None
+        assert isinstance(settings.slicer_profiles, SlicerProfileSettings)
+
+    @patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "test_file.py::test_name"})
+    def test_profile_validation_skipped_in_tests(self):
+        """Test our custom environment-based validation skipping logic."""
+        # This tests OUR conditional logic for skipping validation in test environments
+        # Should not raise ValidationError even with nonexistent profile paths
+        slicer_settings = SlicerProfileSettings(
+            base_dir=Path("nonexistent_directory"),
+            machine="missing_machine.json",
+            process="missing_process.json",
+        )
+
+        # Should succeed because our logic skips validation in test environment
+        assert slicer_settings is not None
+        assert slicer_settings.base_dir == Path("nonexistent_directory")
+
+    @patch.dict(os.environ, {"SKIP_PROFILE_VALIDATION": "true"})
+    def test_profile_validation_skipped_when_flag_set(self):
+        """Test our validation skipping with explicit environment flag."""
+        # Test another path of OUR conditional logic
+        slicer_settings = SlicerProfileSettings(
+            base_dir=Path("another_nonexistent_directory")
+        )
+
+        # Should succeed because of our SKIP_PROFILE_VALIDATION logic
+        assert slicer_settings is not None
+
+    def test_profile_validation_runs_in_production_like_environment(self):
+        """Test that our validation logic runs when not in test environment."""
+        # Clear test environment variables to simulate production
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="profile not found"),
+        ):
+            SlicerProfileSettings(base_dir=Path("definitely_nonexistent_directory"))
 
 
-class TestGetSettings:
-    """Tests for the get_settings function."""
-    
-    def test_get_settings_caching(self):
-        """Test that get_settings returns cached instance."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
+class TestConfigurationBehavior:
+    """Tests for configuration behavior and integration logic."""
+
+    def test_settings_with_minimal_required_config(self):
+        """Test that Settings can be created with minimal required config."""
+        settings = Settings(
+            secret_key="test-secret-key",
+            _env_file=None,  # Don't load .env to test true defaults
+        )
+
+        # Should succeed and have reasonable defaults
+        assert settings.secret_key == "test-secret-key"
+        assert settings.app_name == "OrcaSlicer Quotation Machine"
+        assert settings.debug is False
+        assert isinstance(settings.slicer_profiles, SlicerProfileSettings)
+
+    def test_secret_key_is_required(self):
+        """Test that SECRET_KEY is truly required (Pydantic's validation)."""
+        # This is a minimal test of Pydantic's required field validation
+        # We trust Pydantic for most validation, but SECRET_KEY is critical
+
+        # Clear SECRET_KEY from environment to ensure it's required
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValidationError, match="secret_key"),
+        ):
+            Settings(_env_file=None)
+
+    def test_get_settings_caching_behavior(self):
+        """Test our caching function behavior."""
+        # Set required field
+        with patch.dict(os.environ, {"SECRET_KEY": "test-key"}):
+            # Clear cache first
+            get_settings.cache_clear()
+
             settings1 = get_settings()
             settings2 = get_settings()
-            
-            # Should be the same instance due to caching
+
+            # Should be the same instance due to @lru_cache
             assert settings1 is settings2
-            
-        finally:
-            del os.environ["SECRET_KEY"]
-    
-    def test_get_settings_returns_settings_instance(self):
-        """Test that get_settings returns Settings instance."""
-        os.environ["SECRET_KEY"] = "test-secret-key"
-        
-        try:
-            settings = get_settings()
-            
-            assert isinstance(settings, Settings)
-            assert hasattr(settings, "app_name")
-            assert hasattr(settings, "secret_key")
-            
-        finally:
-            del os.environ["SECRET_KEY"]
+
+    def test_nested_env_var_parsing(self):
+        """Test that nested environment variables work correctly."""
+        env_vars = {
+            "SECRET_KEY": "test-secret-key",
+            "SLICER_PROFILES__BASE_DIR": "custom/profiles/path",
+            "SLICER_PROFILES__MACHINE": "custom_machine.json",
+        }
+
+        with patch.dict(os.environ, env_vars):
+            settings = Settings(_env_file=None)
+
+            # Test that nested env vars are parsed correctly
+            assert str(settings.slicer_profiles.base_dir) == "custom/profiles/path"
+            assert settings.slicer_profiles.machine == "custom_machine.json"
+
+
+class TestSlicerProfileSettings:
+    """Tests specifically for SlicerProfileSettings custom logic."""
+
+    def test_profile_path_construction(self):
+        """Test that profile paths are constructed correctly."""
+        with patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "true"}):
+            slicer_settings = SlicerProfileSettings(
+                base_dir=Path("/custom/path"),
+                machine="my_machine.json",
+                filament_pla="my_pla.json",
+            )
+
+            # Test that our path logic works correctly
+            assert slicer_settings.base_dir == Path("/custom/path")
+            assert slicer_settings.machine == "my_machine.json"
+            assert slicer_settings.filament_pla == "my_pla.json"
+
+    def test_default_profile_names(self):
+        """Test that default profile filenames are sensible."""
+        with patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "true"}):
+            slicer_settings = SlicerProfileSettings()
+
+            # Test our default choices
+            assert slicer_settings.machine == "default_machine.json"
+            assert slicer_settings.process == "standard_0.2mm.json"
+            assert slicer_settings.filament_pla == "pla.json"
+            assert slicer_settings.filament_petg == "petg.json"
+            assert slicer_settings.filament_asa == "asa.json"

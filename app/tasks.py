@@ -1,12 +1,14 @@
 """Celery tasks for background processing."""
 
 import asyncio
+import contextlib
 import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from celery import Celery
+from celery import Celery, Task
 from celery.utils.log import get_task_logger
 
 from app.core.config import get_settings
@@ -17,7 +19,7 @@ from app.services.telegram import TelegramService
 
 # Import Rust validation functions
 try:
-    from orca_quote_machine._rust_core import validate_3d_model
+    from _rust_core import validate_3d_model
 except ImportError:
     print(
         "Warning: Rust validation module not available. Install with 'maturin develop'"
@@ -45,7 +47,7 @@ celery_app.conf.update(
 
 @celery_app.task(bind=True)
 def process_quote_request(
-    self, file_path: str, quote_data: dict, material: str | None = None
+    self: Task, file_path: str, quote_data: dict, material: str | None = None
 ) -> dict:
     """
     Process a quote request in the background.
@@ -93,10 +95,8 @@ def process_quote_request(
         logger.error(f"Quote processing failed for {short_quote_id}: {error_msg}")
 
         # Send error notification
-        try:
+        with contextlib.suppress(Exception):
             asyncio.run(send_failure_notification(error_msg, short_quote_id))
-        except Exception:
-            pass  # Don't fail the task if error notification fails
 
         return {
             "success": False,
@@ -121,7 +121,7 @@ async def run_processing_pipeline(
     material_enum: MaterialType | None,
     quote_id: str,
     short_quote_id: str,
-) -> dict:
+) -> dict[str, Any]:
     """
     Helper async function to orchestrate async calls in the processing pipeline.
     """
@@ -173,7 +173,7 @@ async def send_failure_notification(error_msg: str, quote_id: str) -> None:
 
 
 @celery_app.task
-def cleanup_old_files(max_age_hours: int = 24) -> dict:
+def cleanup_old_files(max_age_hours: int = 24) -> dict[str, Any]:
     """
     Cleanup old uploaded files.
 
