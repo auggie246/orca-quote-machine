@@ -1,28 +1,29 @@
 """Unit tests for Pydantic quote models."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 from pydantic import ValidationError
 
 from app.models.quote import (
-    MaterialType, 
-    QuoteStatus, 
-    QuoteRequest, 
-    SlicingResult, 
+    MaterialType,
+    QuoteRequest,
     QuoteResponse,
-    TelegramMessage
+    QuoteStatus,
+    SlicingResult,
+    TelegramMessage,
 )
 
 
 class TestMaterialType:
     """Tests for MaterialType enum."""
-    
+
     def test_material_type_values(self):
         """Test that MaterialType has expected values."""
         assert MaterialType.PLA == "PLA"
         assert MaterialType.PETG == "PETG"
         assert MaterialType.ASA == "ASA"
-        
+
         # Test that all values are strings
         for material in MaterialType:
             assert isinstance(material.value, str)
@@ -30,7 +31,7 @@ class TestMaterialType:
 
 class TestQuoteStatus:
     """Tests for QuoteStatus enum."""
-    
+
     def test_quote_status_values(self):
         """Test that QuoteStatus has expected values."""
         assert QuoteStatus.PENDING == "pending"
@@ -41,7 +42,7 @@ class TestQuoteStatus:
 
 class TestQuoteRequest:
     """Tests for QuoteRequest model validation."""
-    
+
     def test_valid_quote_request(self):
         """Test creating a valid quote request."""
         data = {
@@ -51,15 +52,15 @@ class TestQuoteRequest:
             "color": "Red",
             "filename": "test.stl"
         }
-        
+
         quote = QuoteRequest(**data)
-        
+
         assert quote.name == "John Doe"
         assert quote.mobile == "+6591234567"
         assert quote.material == MaterialType.PLA
         assert quote.color == "Red"
         assert quote.filename == "test.stl"
-    
+
     def test_quote_request_optional_fields(self):
         """Test quote request with optional fields."""
         data = {
@@ -67,15 +68,15 @@ class TestQuoteRequest:
             "mobile": "91234567",
             "filename": "model.stl"
         }
-        
+
         quote = QuoteRequest(**data)
-        
+
         assert quote.name == "Jane Doe"
         assert quote.mobile == "91234567"
         assert quote.material is None
         assert quote.color is None
         assert quote.filename == "model.stl"
-    
+
     def test_name_validation_valid(self):
         """Test valid name validation."""
         valid_names = [
@@ -86,7 +87,7 @@ class TestQuoteRequest:
             "Dr. Smith",
             "李明"
         ]
-        
+
         for name in valid_names:
             data = {
                 "name": name,
@@ -95,7 +96,7 @@ class TestQuoteRequest:
             }
             quote = QuoteRequest(**data)
             assert quote.name == name.strip()
-    
+
     def test_name_validation_invalid(self):
         """Test invalid name validation."""
         invalid_names = [
@@ -105,7 +106,7 @@ class TestQuoteRequest:
             "John123",  # Contains numbers
             "John@Doe",  # Contains special chars
         ]
-        
+
         for name in invalid_names:
             data = {
                 "name": name,
@@ -114,7 +115,7 @@ class TestQuoteRequest:
             }
             with pytest.raises(ValidationError):
                 QuoteRequest(**data)
-    
+
     def test_mobile_validation_valid(self):
         """Test valid mobile number validation."""
         valid_mobiles = [
@@ -125,7 +126,7 @@ class TestQuoteRequest:
             "(555) 123-4567",
             "555.123.4567"
         ]
-        
+
         for mobile in valid_mobiles:
             data = {
                 "name": "John Doe",
@@ -134,8 +135,10 @@ class TestQuoteRequest:
             }
             quote = QuoteRequest(**data)
             # Check that formatting is cleaned up
-            assert quote.mobile.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "").replace(".", "").isdigit()
-    
+            cleaned_mobile = quote.mobile.replace("+", "").replace("-", "").replace(" ", "")
+            cleaned_mobile = cleaned_mobile.replace("(", "").replace(")", "").replace(".", "")
+            assert cleaned_mobile.isdigit()
+
     def test_mobile_validation_invalid(self):
         """Test invalid mobile number validation."""
         invalid_mobiles = [
@@ -145,7 +148,7 @@ class TestQuoteRequest:
             "++6591234567",  # Multiple plus signs
             "1234567890123456",  # Too long
         ]
-        
+
         for mobile in invalid_mobiles:
             data = {
                 "name": "John Doe",
@@ -154,7 +157,7 @@ class TestQuoteRequest:
             }
             with pytest.raises(ValidationError):
                 QuoteRequest(**data)
-    
+
     def test_filename_validation(self):
         """Test filename validation."""
         data = {
@@ -162,14 +165,14 @@ class TestQuoteRequest:
             "mobile": "+6591234567",
             "filename": ""  # Empty filename
         }
-        
+
         with pytest.raises(ValidationError):
             QuoteRequest(**data)
 
 
 class TestSlicingResult:
     """Tests for SlicingResult model."""
-    
+
     def test_valid_slicing_result(self):
         """Test creating a valid slicing result."""
         data = {
@@ -178,40 +181,40 @@ class TestSlicingResult:
             "layer_count": 200,
             "estimated_cost": 30.25
         }
-        
+
         result = SlicingResult(**data)
-        
+
         assert result.print_time_minutes == 120
         assert result.filament_weight_grams == 25.5
         assert result.layer_count == 200
         assert result.estimated_cost == 30.25
-    
+
     def test_slicing_result_optional_fields(self):
         """Test slicing result with only required fields."""
         data = {
             "print_time_minutes": 60,
             "filament_weight_grams": 15.0
         }
-        
+
         result = SlicingResult(**data)
-        
+
         assert result.print_time_minutes == 60
         assert result.filament_weight_grams == 15.0
         assert result.layer_count is None
         assert result.estimated_cost is None
-    
+
     def test_slicing_result_negative_values(self):
         """Test that negative values are rejected."""
         with pytest.raises(ValidationError):
             SlicingResult(print_time_minutes=-1, filament_weight_grams=20.0)
-        
+
         with pytest.raises(ValidationError):
             SlicingResult(print_time_minutes=60, filament_weight_grams=-5.0)
 
 
 class TestQuoteResponse:
     """Tests for QuoteResponse model."""
-    
+
     def test_valid_quote_response(self):
         """Test creating a valid quote response."""
         now = datetime.now()
@@ -232,19 +235,19 @@ class TestQuoteResponse:
             "created_at": now,
             "processed_at": now
         }
-        
+
         response = QuoteResponse(**data)
-        
+
         assert response.request_id == "test-123"
         assert response.name == "John Doe"
         assert response.total_cost == 30.53
         assert response.status == QuoteStatus.COMPLETED
-    
+
     def test_print_time_hours_calculation(self):
         """Test that print_time_hours is calculated from minutes."""
         data = {
             "request_id": "test-123",
-            "name": "John Doe", 
+            "name": "John Doe",
             "mobile": "+6591234567",
             "material": "PLA",
             "color": None,
@@ -257,16 +260,16 @@ class TestQuoteResponse:
             "status": QuoteStatus.COMPLETED,
             "created_at": datetime.now()
         }
-        
+
         response = QuoteResponse(**data)
-        
+
         # Should calculate hours from minutes
         assert response.print_time_hours == 2.5
 
 
 class TestTelegramMessage:
     """Tests for TelegramMessage model."""
-    
+
     def test_valid_telegram_message(self):
         """Test creating a valid telegram message."""
         data = {
@@ -280,13 +283,13 @@ class TestTelegramMessage:
             "filament_weight": "25.5g",
             "total_cost": 30.25
         }
-        
+
         message = TelegramMessage(**data)
-        
+
         assert message.quote_id == "test-123"
         assert message.customer_name == "John Doe"
         assert message.total_cost == 30.25
-    
+
     def test_format_message_with_material_and_color(self):
         """Test message formatting with material and color."""
         data = {
@@ -300,10 +303,10 @@ class TestTelegramMessage:
             "filament_weight": "25.5g",
             "total_cost": 30.25
         }
-        
+
         message = TelegramMessage(**data)
         formatted = message.format_message()
-        
+
         assert "New Quote Request #test-123" in formatted
         assert "Customer: John Doe" in formatted
         assert "WhatsApp: +6591234567" in formatted
@@ -313,7 +316,7 @@ class TestTelegramMessage:
         assert "Filament: 25.5g" in formatted
         assert "Total Cost: S$30.25" in formatted
         assert "Reply to this message" in formatted
-    
+
     def test_format_message_without_material_and_color(self):
         """Test message formatting without optional fields."""
         data = {
@@ -327,10 +330,10 @@ class TestTelegramMessage:
             "filament_weight": "18.2g",
             "total_cost": 22.50
         }
-        
+
         message = TelegramMessage(**data)
         formatted = message.format_message()
-        
+
         assert "New Quote Request #test-456" in formatted
         assert "Material: PLA (default)" in formatted
         # Should not contain color info when color is None
