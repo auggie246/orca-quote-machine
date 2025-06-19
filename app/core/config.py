@@ -70,7 +70,7 @@ class Settings(BaseSettings):
         "/var/lib/flatpak/exports/bin/io.github.softfever.OrcaSlicer"
     )
     slicer_timeout: int = 300  # 5 minutes
-    slicer_profiles: SlicerProfileSettings = None  # type: ignore
+    slicer_profiles: SlicerProfileSettings | None = None
 
     # Pricing settings
     default_price_per_kg: float = 25.0  # S$25/kg for PLA
