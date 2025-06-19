@@ -50,7 +50,7 @@ class QuoteRequest(BaseModel):
     @classmethod
     def validate_name(cls: type["QuoteRequest"], v: str) -> str:
         """Validate name contains only allowed characters."""
-        if not re.match(r"^[a-zA-Z\s\-\.]+$", v.strip()):
+        if not re.match(r"^[\w\s\-\.']+$", v.strip(), re.UNICODE):
             raise ValueError("Name contains invalid characters")
         return v.strip()
 

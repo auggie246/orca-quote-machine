@@ -11,7 +11,8 @@ import aiofiles
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates, TemplateResponse
+from fastapi.templating import Jinja2Templates
+from starlette.responses import Response
 
 from app.core.config import get_settings
 from app.models.quote import MaterialType, QuoteRequest
@@ -55,7 +56,7 @@ def secure_filename(filename: str) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request) -> TemplateResponse:
+async def home(request: Request) -> Response:
     """Home page with quote request form."""
     # Get available materials from slicer service (includes custom materials)
     try:

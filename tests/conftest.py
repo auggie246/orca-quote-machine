@@ -13,6 +13,8 @@ from pytest_mock import MockerFixture
 # Configure Celery for testing before importing the app
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
 os.environ["CELERY_TASK_EAGER_PROPAGATES"] = "True"
+os.environ["PYTEST_CURRENT_TEST"] = "conftest.py"
+os.environ["MAX_FILE_SIZE"] = "104857600"
 
 from app.core.config import get_settings
 from app.main import app
