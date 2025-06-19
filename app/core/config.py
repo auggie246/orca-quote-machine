@@ -26,13 +26,13 @@ class SlicerProfileSettings(BaseModel):
     @model_validator(mode="after")
     def validate_profiles_exist(self) -> "SlicerProfileSettings":
         """Validate that all configured profile files exist.
-        
+
         Skip validation in test environments or when SKIP_PROFILE_VALIDATION is set.
         """
         # Skip validation in test environments
         if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SKIP_PROFILE_VALIDATION"):
             return self
-            
+
         profiles_to_check = [
             ("machine", self.machine),
             ("process", self.process),

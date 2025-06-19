@@ -12,6 +12,7 @@ import tempfile
 # OrcaSlicer CLI path
 ORCASLICER_CLI = "/var/lib/flatpak/exports/bin/io.github.softfever.OrcaSlicer"
 
+
 def test_orcaslicer_info(model_path: str):
     """Test the --info flag to see what information is available."""
     print(f"\n=== Testing --info flag with {model_path} ===")
@@ -21,7 +22,7 @@ def test_orcaslicer_info(model_path: str):
             [ORCASLICER_CLI, "--info", model_path],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,
         )
 
         print(f"Return code: {result.returncode}")
@@ -35,6 +36,7 @@ def test_orcaslicer_info(model_path: str):
         print(f"Command failed: {e}")
     except FileNotFoundError:
         print(f"OrcaSlicer CLI not found at {ORCASLICER_CLI}")
+
 
 def test_orcaslicer_slice_export(model_path: str):
     """Test slicing with --export-slicedata to see what files are generated."""
@@ -50,9 +52,12 @@ def test_orcaslicer_slice_export(model_path: str):
             command = [
                 ORCASLICER_CLI,
                 model_path,
-                "--slice", "0",  # Slice all plates
-                "--export-slicedata", output_dir,
-                "--debug", "3"  # Info level debugging
+                "--slice",
+                "0",  # Slice all plates
+                "--export-slicedata",
+                output_dir,
+                "--debug",
+                "3",  # Info level debugging
             ]
 
             print(f"Running command: {' '.join(command)}")
@@ -61,7 +66,7 @@ def test_orcaslicer_slice_export(model_path: str):
                 command,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes timeout
+                timeout=300,  # 5 minutes timeout
             )
 
             print(f"Return code: {result.returncode}")
@@ -73,10 +78,10 @@ def test_orcaslicer_slice_export(model_path: str):
             print(f"\n=== Inspecting output directory: {output_dir} ===")
             if os.path.exists(output_dir):
                 for root, _dirs, files in os.walk(output_dir):
-                    level = root.replace(output_dir, '').count(os.sep)
-                    indent = ' ' * 2 * level
+                    level = root.replace(output_dir, "").count(os.sep)
+                    indent = " " * 2 * level
                     print(f"{indent}{os.path.basename(root)}/")
-                    subindent = ' ' * 2 * (level + 1)
+                    subindent = " " * 2 * (level + 1)
                     for file in files:
                         file_path = os.path.join(root, file)
                         file_size = os.path.getsize(file_path)
@@ -85,7 +90,7 @@ def test_orcaslicer_slice_export(model_path: str):
                         # Try to read small files to understand content
                         if file_size < 10000:  # Less than 10KB
                             try:
-                                with open(file_path, encoding='utf-8') as f:
+                                with open(file_path, encoding="utf-8") as f:
                                     content = f.read()
                                     print(f"{subindent}Content preview:")
                                     print(f"{subindent}{content[:500]}...")
@@ -100,6 +105,7 @@ def test_orcaslicer_slice_export(model_path: str):
             print(f"Slicing command failed: {e}")
         except FileNotFoundError:
             print(f"OrcaSlicer CLI not found at {ORCASLICER_CLI}")
+
 
 def create_test_stl() -> str:
     """Create a simple test STL file if none exists."""
@@ -137,15 +143,16 @@ def create_test_stl() -> str:
   endfacet
 endsolid cube"""
 
-        with open(test_file, 'w') as f:
+        with open(test_file, "w") as f:
             f.write(stl_content)
         print(f"Created test STL file: {test_file}")
 
     return test_file
 
+
 def main() -> None:
     print("OrcaSlicer CLI Proof of Concept")
-    print("="*50)
+    print("=" * 50)
 
     # Check if OrcaSlicer CLI exists
     if not os.path.exists(ORCASLICER_CLI):
@@ -168,11 +175,12 @@ def main() -> None:
     test_orcaslicer_info(test_file)
     test_orcaslicer_slice_export(test_file)
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("PoC completed. Check the output above to understand:")
     print("1. What information --info provides")
     print("2. What files --export-slicedata creates")
     print("3. Where print time and filament usage might be stored")
+
 
 if __name__ == "__main__":
     main()

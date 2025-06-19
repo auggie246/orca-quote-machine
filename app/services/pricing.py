@@ -13,7 +13,9 @@ class PricingService:
         self.settings = get_settings()
 
     def calculate_quote(
-        self: "PricingService", slicing_result: SlicingResult, material: MaterialType | None = None
+        self: "PricingService",
+        slicing_result: SlicingResult,
+        material: MaterialType | None = None,
     ) -> dict[str, Any]:
         """
         Calculate pricing for a 3D print job.

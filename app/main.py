@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
+                     status)
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -140,7 +141,9 @@ async def create_quote(
             filename=safe_filename,
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
 
     # Save uploaded file with size validation during write
     file_id = str(uuid.uuid4())
