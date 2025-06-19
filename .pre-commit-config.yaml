@@ -7,6 +7,15 @@
 minimum_pre_commit_version: "3.0.0"
 
 repos:
+  # SECRET SCANNING - CRITICAL SECURITY CHECK (must be first)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+        name: 🚨 Detect secrets and credentials
+        description: Scan for API keys, tokens, and other secrets
+        verbose: true
+
   # Standard hooks for file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -17,6 +26,7 @@ repos:
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
+        args: ['--maxkb=10240']  # 10MB limit
 
   # Ruff pre-commit hooks (replaces black, isort, and many flake8 plugins)
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -46,3 +56,13 @@ repos:
           - "."
         # Point mypy to the same directories we check in CI.
         args: ["--config-file=pyproject.toml", "app", "tests"]
+
+  # Local custom hooks for additional security
+  - repo: local
+    hooks:
+      - id: prevent-env-files
+        name: 🚨 Prevent .env files from being committed
+        entry: bash -c 'if git diff --cached --name-only | grep -E "\\.env$"; then echo "ERROR: .env files contain secrets and should NEVER be committed!"; exit 1; fi'
+        language: system
+        stages: [commit]
+        verbose: true

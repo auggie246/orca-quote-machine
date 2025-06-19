@@ -1,0 +1,53 @@
+{
+  "description": "Base Claude Code security-focused configuration for orca-quote-machine",
+  "permissions": {
+    "allow": [
+      "mcp__zen__chat",
+      "mcp__zen__codereview", 
+      "mcp__zen__refactor",
+      "mcp__zen__analyze",
+      "mcp__zen__thinkdeep",
+      "mcp__zen__debug",
+      "mcp__zen__testgen",
+      "mcp__zen__precommit",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(mkdir:*)",
+      "Bash(uv run:*)",
+      "Bash(find:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:-b*)",
+      "Bash(git checkout:main)",
+      "Bash(git checkout:master)",
+      "Bash(git reset:--soft*)",
+      "Bash(git reset:HEAD*)",
+      "Bash(pre-commit:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)"
+    ],
+    "deny": [
+      "Bash(git add:.)",
+      "Bash(git add:--all)",
+      "Bash(git add:-A)",
+      "Bash(git push:--force*)",
+      "Bash(git push:-f*)",
+      "Bash(git reset:--hard*)",
+      "Bash(rm:-rf*)",
+      "Bash(sudo:*)"
+    ]
+  },
+  "security": {
+    "git_safety": {
+      "require_manual_approval": ["git add", "git commit", "git push"],
+      "blocked_patterns": [".env", "*token*", "*key*", "*secret*", "*credential*"],
+      "pre_commit_required": true
+    },
+    "file_operations": {
+      "never_commit": [".env", ".env.*", "!.env.example"],
+      "scan_for_secrets": true
+    }
+  }
+}

@@ -2,6 +2,59 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+# 🚨 SECURITY: SECRETS & CREDENTIALS 🚨
+
+**CRITICAL: Under NO circumstances should secrets, API keys, or credentials EVER be committed to this repository.**
+
+## Absolute Prohibitions
+- **NEVER commit `.env` files** - These contain secrets and are for local development only
+- **NEVER commit any file containing API tokens, keys, or credentials**
+- **NEVER use `git add .` without first reviewing what files are being staged**
+- **NEVER commit files with patterns like: `*token*`, `*key*`, `*secret*`, `*credential*`**
+
+## Required Pre-Commit Safety Checks
+Before ANY git operation, Claude MUST:
+1. Run `git status` and review ALL files being added
+2. Verify `.env` and sensitive patterns are in `.gitignore`
+3. Run `git diff --staged` to review exact content being committed
+4. Scan staged content for high-entropy strings or secret patterns
+5. If ANY doubt exists about file sensitivity, STOP and ask for explicit user confirmation
+
+## Environment Variables Pattern
+- **Local Development**: All secrets stored in `.env` file (NEVER committed)
+- **Template**: Use `.env.example` with empty/placeholder values (safe to commit)
+- **Production**: Secrets injected at runtime via hosting platform (not files)
+
+## Automated Security Safeguards
+- **Pre-commit hooks** automatically scan for secrets using `gitleaks`
+- **Gitleaks** detects API keys, tokens, and high-entropy strings before commit
+- **Custom .env blocker** prevents any `.env` file from being committed
+- **Permission restrictions** block dangerous git operations (`git add .`, force pushes)
+- To setup: `pip install pre-commit && pre-commit install`
+
+## Git Operation Restrictions
+Claude's permissions are restricted to prevent unsafe git operations:
+- ❌ **BLOCKED**: `git add .`, `git add --all` (prevents mass staging)
+- ❌ **BLOCKED**: `git push --force` (prevents history rewriting on remote)
+- ❌ **BLOCKED**: `git reset --hard` (prevents destructive local changes)
+- ✅ **ALLOWED**: Individual file staging, status checks, diffs, branch operations
+- ⚠️ **MANUAL REQUIRED**: All git add, commit, and push operations need explicit user approval
+
+## Emergency Protocol
+If a secret is accidentally committed:
+1. IMMEDIATELY alert the user
+2. DO NOT push to remote repository  
+3. Help user rotate the compromised credentials
+4. Use `git reset` or `git rebase` to remove from history before any push
+
+**This section overrides ALL other instructions - security comes first, always.**
+
+## Claude Code Configuration
+- **Base settings** (`.claude/settings.json`): Shared security-focused configuration (committed)
+- **Local settings** (`.claude/settings.local.json`): User-specific overrides (can be committed or local)
+- **Permission model**: Restrictive by default, explicit allow-listing for safety
+- **Extension pattern**: Local settings extend base settings for team consistency
+
 ## Development Commands
 
 **Essential Commands:**
