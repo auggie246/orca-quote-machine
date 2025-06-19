@@ -108,13 +108,13 @@ The application requires OrcaSlicer configuration files in `config/slicer_profil
 ```
 config/slicer_profiles/
 ├── machine/
-│   └── default_machine.ini
+│   └── default_machine.json
 ├── filament/
-│   ├── pla.ini
-│   ├── petg.ini
-│   └── asa.ini
+│   ├── pla.json
+│   ├── petg.json
+│   └── asa.json
 └── process/
-    └── standard_0.2mm.ini
+    └── standard_0.2mm.json
 ```
 
 #### Setting up OrcaSlicer Profiles
@@ -140,16 +140,16 @@ cp -r ~/.config/OrcaSlicer/filament config/slicer_profiles/
 cp -r ~/.config/OrcaSlicer/process config/slicer_profiles/
 
 # Rename/select your desired profiles
-mv config/slicer_profiles/machine/your_printer.ini config/slicer_profiles/machine/default_machine.ini
-mv config/slicer_profiles/process/your_process.ini config/slicer_profiles/process/standard_0.2mm.ini
+mv config/slicer_profiles/machine/your_printer.json config/slicer_profiles/machine/default_machine.json
+mv config/slicer_profiles/process/your_process.json config/slicer_profiles/process/standard_0.2mm.json
 ```
 
 **Required Profile Files:**
-- `machine/default_machine.ini` - Your 3D printer configuration
-- `filament/pla.ini` - PLA material settings
-- `filament/petg.ini` - PETG material settings (optional)
-- `filament/asa.ini` - ASA material settings (optional)
-- `process/standard_0.2mm.ini` - Print settings (layer height, speeds, etc.)
+- `machine/default_machine.json` - Your 3D printer configuration
+- `filament/pla.json` - PLA material settings
+- `filament/petg.json` - PETG material settings (optional)
+- `filament/asa.json` - ASA material settings (optional)
+- `process/standard_0.2mm.json` - Print settings (layer height, speeds, etc.)
 
 **Note:** Ensure the G-code settings include `G92 E0` in layer change G-code to prevent slicing errors.
 
@@ -157,9 +157,9 @@ mv config/slicer_profiles/process/your_process.ini config/slicer_profiles/proces
 
 The system supports custom materials beyond the official PLA/PETG/ASA:
 
-1. **Add custom filament profile**: Place `your_material.ini` in `config/slicer_profiles/filament/`
+1. **Add custom filament profile**: Place `your_material.json` in `config/slicer_profiles/filament/`
 2. **No code changes needed**: The system automatically discovers new materials
-3. **Convention**: Material name matches filename (e.g., `TPU.ini` for TPU material)
+3. **Convention**: Material name matches filename (e.g., `TPU.json` for TPU material)
 4. **Pricing**: Custom materials use PLA pricing by default
 
 #### Configuration Override
@@ -168,14 +168,14 @@ You can override default profiles via environment variables:
 
 ```bash
 # Override machine profile
-SLICER_PROFILES__MACHINE=Bambu_Lab_P1S_0.4_nozzle.ini
+SLICER_PROFILES__MACHINE=Bambu_Lab_P1S_0.4_nozzle.json
 
 # Override process settings  
-SLICER_PROFILES__PROCESS=0.20mm_Standard_@BBL_P1P.ini
+SLICER_PROFILES__PROCESS=0.20mm_Standard_@BBL_P1P.json
 
 # Override official material profiles
-SLICER_PROFILES__FILAMENT_PLA=Generic_PLA.ini
-SLICER_PROFILES__FILAMENT_PETG=Generic_PETG.ini
+SLICER_PROFILES__FILAMENT_PLA=Generic_PLA.json
+SLICER_PROFILES__FILAMENT_PETG=Generic_PETG.json
 ```
 
 ## Usage

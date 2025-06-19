@@ -4,8 +4,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, validator
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class SlicerProfileSettings(BaseModel):
@@ -14,38 +14,32 @@ class SlicerProfileSettings(BaseModel):
     base_dir: Path = Path("config/slicer_profiles")
 
     # Default machine and process profiles
-    machine: str = "default_machine.ini"
-    process: str = "standard_0.2mm.ini"
+    machine: str = "default_machine.json"
+    process: str = "standard_0.2mm.json"
 
     # Per-material filament profiles for official materials
     # These act as overrides for the default file-based convention
-    filament_pla: str = "pla.ini"
-    filament_petg: str = "petg.ini"
-    filament_asa: str = "asa.ini"
+    filament_pla: str = "pla.json"
+    filament_petg: str = "petg.json"
+    filament_asa: str = "asa.json"
 
-    @validator("machine")
-    def machine_profile_must_exist(cls, v, values):
-        base_dir = values.get("base_dir", Path("config/slicer_profiles"))
-        profile_path = base_dir / "machine" / v
-        if not profile_path.exists():
-            raise ValueError(f"Machine profile not found at: {profile_path}")
-        return v
-
-    @validator("process")
-    def process_profile_must_exist(cls, v, values):
-        base_dir = values.get("base_dir", Path("config/slicer_profiles"))
-        profile_path = base_dir / "process" / v
-        if not profile_path.exists():
-            raise ValueError(f"Process profile not found at: {profile_path}")
-        return v
-
-    @validator("filament_pla", "filament_petg", "filament_asa")
-    def official_filament_profile_must_exist(cls, v, values):
-        base_dir = values.get("base_dir", Path("config/slicer_profiles"))
-        profile_path = base_dir / "filament" / v
-        if not profile_path.exists():
-            raise ValueError(f"Official filament profile not found at: {profile_path}")
-        return v
+    @model_validator(mode='after')
+    def validate_profiles_exist(self) -> 'SlicerProfileSettings':
+        """Validate that all configured profile files exist."""
+        profiles_to_check = [
+            ("machine", self.machine),
+            ("process", self.process),
+            ("filament", self.filament_pla),
+            ("filament", self.filament_petg),
+            ("filament", self.filament_asa),
+        ]
+        for profile_type, filename in profiles_to_check:
+            profile_path = self.base_dir / profile_type / filename
+            if not profile_path.exists():
+                raise ValueError(
+                    f"{profile_type.capitalize()} profile not found at: {profile_path}"
+                )
+        return self
 
 
 class Settings(BaseSettings):
@@ -96,21 +90,27 @@ class Settings(BaseSettings):
     # Security
     secret_key: str  # Must be set via environment variable
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        env_nested_delimiter = "__"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        env_nested_delimiter="__",
+    )
 
-    @validator("upload_dir")
-    def create_upload_dir(cls, v):
-        """Ensure upload directory exists."""
-        os.makedirs(v, exist_ok=True)
-        return v
+    @field_validator("upload_dir")
+    @classmethod
+    def validate_upload_dir(cls, dir_path: str) -> str:
+        """Validate the upload directory path.
+        
+        Note: Directory creation is handled during application startup,
+        not during configuration validation.
+        """
+        return dir_path
 
-    @validator("allowed_extensions")
-    def normalize_extensions(cls, v):
+    @field_validator("allowed_extensions")
+    @classmethod
+    def normalize_extensions(cls, extensions: list[str]) -> list[str]:
         """Normalize file extensions to lowercase with dots."""
-        return [ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in v]
+        return [ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in extensions]
 
 
 @lru_cache
