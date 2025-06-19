@@ -1,9 +1,12 @@
 {
+  "version": "1.1",
+  "project_name": "3D Printing Quotation System",
   "description": "Base Claude Code security-focused configuration for orca-quote-machine",
+  "operational_mode": "pro_collaborator",
   "permissions": {
     "allow": [
       "mcp__zen__chat",
-      "mcp__zen__codereview", 
+      "mcp__zen__codereview",
       "mcp__zen__refactor",
       "mcp__zen__analyze",
       "mcp__zen__thinkdeep",
@@ -49,5 +52,98 @@
       "never_commit": [".env", ".env.*", "!.env.example"],
       "scan_for_secrets": true
     }
-  }
+  },
+  "modes": {
+    "pro_collaborator": {
+      "description": "Deep analysis, proactive checks, pattern enforcement, assumes high user expertise",
+      "model_preference": "pro",
+      "thinking_mode": "high",
+      "proactive_checks": ["all"],
+      "request_planning": true,
+      "domain_expertise": true
+    },
+    "fast_prototyper": {
+      "description": "Quick code generation, less verbose, focuses on functionality over patterns",
+      "model_preference": "flash",
+      "thinking_mode": "medium",
+      "proactive_checks": ["critical"],
+      "request_planning": false,
+      "domain_expertise": false
+    }
+  },
+  "proactive_checks": {
+    "enable": true,
+    "checks": {
+      "BLOCKING_IO_IN_ASYNC_ROUTE": {
+        "level": "error",
+        "description": "Detects blocking I/O in FastAPI async routes, recommends Celery task or run_in_executor"
+      },
+      "UNHANDLED_RUST_PANIC": {
+        "level": "error",
+        "description": "Ensures Python code calling Rust functions has proper exception handling"
+      },
+      "MISSING_CELERY_IDEMPOTENCY": {
+        "level": "warning",
+        "description": "Reviews Celery tasks for safe re-execution patterns"
+      },
+      "INCORRECT_ORCASLICER_CALL": {
+        "level": "error",
+        "description": "Validates subprocess calls to OrcaSlicer against known CLI arguments"
+      },
+      "ASYNC_SYNC_BOUNDARY_VIOLATION": {
+        "level": "error",
+        "description": "Detects improper mixing of async/sync code without proper coordination"
+      },
+      "MISSING_FILE_CLEANUP": {
+        "level": "warning",
+        "description": "Ensures uploaded files are cleaned up in finally blocks"
+      }
+    }
+  },
+  "architectural_patterns": {
+    "api_task_offload": {
+      "description": "Pattern for long-running operations: FastAPI -> Celery -> Status polling",
+      "required_components": ["endpoint", "celery_task", "status_endpoint", "pydantic_models"]
+    },
+    "rust_calculation": {
+      "description": "Pattern for CPU-bound operations: PyO3 bindings with panic handling",
+      "required_components": ["rust_function", "pyo3_binding", "python_wrapper", "error_handling"]
+    }
+  },
+  "mcp_servers": {
+    "zen": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-zen@latest"],
+      "disabled": false
+    },
+    "ide": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-ide@latest"],
+      "disabled": false
+    }
+  },
+  "rules": [
+    {
+      "for_mcp_server": "zen",
+      "allow": [
+        "mcp__zen__thinkdeep",
+        "mcp__zen__codereview",
+        "mcp__zen__debug",
+        "mcp__zen__analyze",
+        "mcp__zen__chat",
+        "mcp__zen__precommit",
+        "mcp__zen__testgen",
+        "mcp__zen__refactor",
+        "mcp__zen__tracer",
+        "mcp__zen__version"
+      ]
+    },
+    {
+      "for_mcp_server": "ide",
+      "allow": [
+        "mcp__ide__getDiagnostics",
+        "mcp__ide__executeCode"
+      ]
+    }
+  ]
 }
