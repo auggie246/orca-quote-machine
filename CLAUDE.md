@@ -58,6 +58,28 @@ If a secret is accidentally committed:
 - **Model Preference**: `pro` for code changes and complex analysis
 - **Proactive Checks**: Enabled for architectural pattern enforcement and error prevention
 
+## Environment Validation Patterns
+
+**Before Starting Work - Always Run These Checks:**
+```bash
+# 1. Verify core services
+redis-cli ping                           # Expected: PONG
+uv run python -c "from _rust_core import validate_3d_model; print('Rust OK')"  # Expected: "Rust OK"
+
+# 2. Verify OrcaSlicer integration
+ls -la $ORCASLICER_CLI_PATH             # Expected: executable file
+ls config/slicer_profiles/{machine,filament,process}/  # Expected: profile files
+
+# 3. Verify development environment
+uv run pytest --collect-only tests/    # Expected: X tests collected
+uv run ruff check app tests           # Expected: All checks passed
+```
+
+**Claude Behavior Guidelines:**
+- **ALWAYS validate environment** before suggesting code changes involving Redis, Rust, or OrcaSlicer
+- **Proactively suggest fixes** when validation fails (e.g., "Run `./scripts/setup.sh` to install missing dependencies")
+- **Include validation commands** in task planning for complex features
+
 ## Development Commands
 
 **Essential Commands:**
@@ -67,7 +89,7 @@ If a secret is accidentally committed:
 ./scripts/worker.sh              # Celery background worker
 ./scripts/production-server.sh   # Production server (4 workers, optimized)
 ./scripts/test.sh               # Full test suite (Python + Rust + integration)
-./scripts/format.sh             # Code formatting (black, isort, mypy)
+./scripts/format.sh             # Code formatting (ruff format + check + mypy)
 ```
 
 **Manual Commands:**
@@ -463,6 +485,96 @@ def test_pla_price_is_25_dollars():
 - Tasks that provide no organizational benefit
 
 This system demonstrates thoroughness and helps users track progress on complex requests.
+
+## Technical Debt Management
+
+**Debt Tracking Standards:**
+
+**TODO Comment Format (for trackable technical debt):**
+```python
+# TODO-DEBT: [CATEGORY] Brief description - Priority: HIGH/MEDIUM/LOW
+# Context: Why this exists and what should replace it
+# Example: TODO-DEBT: [MYPY] Remove union-attr ignore when Pydantic BaseSettings typing improves - Priority: LOW
+```
+
+**Debt Categories:**
+- **[MYPY]**: Type checking improvements
+- **[ASYNC]**: Async/sync boundary issues
+- **[PERF]**: Performance optimizations
+- **[RUST]**: Rust integration improvements
+- **[SECURITY]**: Security hardening
+- **[ARCH]**: Architectural improvements
+
+**Debt Resolution Workflow:**
+1. **Inventory Phase**: Use `grep -r "TODO-DEBT" app/ tests/` to list all tracked debt
+2. **Prioritization**: HIGH = blocks production, MEDIUM = affects maintainability, LOW = future improvements
+3. **Resolution**: Address in order: HIGH → MEDIUM → LOW within same category
+4. **Validation**: Use `mcp__zen__codereview` for complex debt resolution
+
+**Monthly Debt Review Process:**
+```bash
+# Generate debt report
+grep -r "TODO-DEBT.*Priority: HIGH" app/ tests/
+grep -r "TODO-DEBT.*Priority: MEDIUM" app/ tests/
+grep -r "TODO-DEBT.*Priority: LOW" app/ tests/
+
+# Target: Resolve 1-2 HIGH priority items per month
+# Target: Address 1 MEDIUM priority item per month when no HIGH items exist
+```
+
+**Integration with Type Ignores:**
+```python
+# Current: self.profiles_dir = self.settings.slicer_profiles.base_dir  # type: ignore[union-attr]
+# Improved:
+# TODO-DEBT: [MYPY] Remove union-attr ignore when Pydantic BaseSettings typing improves - Priority: LOW
+# Context: Settings.slicer_profiles is Optional but always set in validation, Pydantic typing unclear
+self.profiles_dir = self.settings.slicer_profiles.base_dir  # type: ignore[union-attr]
+```
+
+## Problem Escalation & Tool Strategy
+
+**Escalation Decision Tree:**
+
+**Level 1 - Direct Implementation (No special tools needed)**
+- Single file edits with clear requirements
+- Bug fixes with obvious causes
+- Adding simple validation or configuration
+- Standard CRUD operations
+
+**Level 2 - Use Standard Analysis Tools**
+- Multi-file changes requiring codebase understanding
+- Debugging with unclear error messages
+- Performance optimization needs
+- Integration between 2-3 components
+- **Tools**: Grep, Read, TodoWrite for planning
+
+**Level 3 - Use Advanced Analysis (mcp__zen__* tools)**
+- Complex architectural decisions
+- Root cause analysis for mysterious issues
+- Security analysis and code review
+- Large refactoring or system redesign
+- Integration across 4+ components
+
+**Specific Tool Usage Patterns:**
+```bash
+# Before making architectural changes
+mcp__zen__thinkdeep    # Deep analysis of design decisions
+mcp__zen__chat         # Validate approach with thinking partner
+
+# Before committing any changes  
+mcp__zen__precommit    # MANDATORY - validate all git operations
+
+# When debugging complex issues
+mcp__zen__debug        # Systematic root cause analysis with file evidence
+
+# When adding major features
+mcp__zen__codereview   # Comprehensive code quality analysis
+```
+
+**Claude Decision Guidelines:**
+- **Automatically escalate** to Level 3 when encountering: security issues, async/sync boundary problems, performance bottlenecks
+- **Use thinking_mode: 'high'** for all architectural decisions in this complex multi-language system
+- **Always include relevant files** when using advanced tools (don't limit context)
 
 ## Advanced Analysis Tools
 
