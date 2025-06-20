@@ -21,10 +21,10 @@ class SlicerError(Exception):
 class OrcaSlicerService:
     """Service for interacting with OrcaSlicer CLI."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = get_settings()
         self.cli_path = self.settings.orcaslicer_cli_path
-        self.profiles_dir = self.settings.slicer_profiles.base_dir
+        self.profiles_dir = self.settings.slicer_profiles.base_dir  # type: ignore[union-attr]
         self.filament_profiles_dir = self.profiles_dir / "filament"
 
     def _get_filament_profile_path(self, material_name: str) -> Path:
@@ -43,7 +43,7 @@ class OrcaSlicerService:
             profile_filename = getattr(profile_config, config_key)
             profile_path = self.filament_profiles_dir / profile_filename
             # The Pydantic validator already checked this at startup, so we can trust it exists.
-            return profile_path
+            return profile_path  # type: ignore[no-any-return]
 
         # 2. Fallback to file-based convention for custom materials.
         # Convention: material name 'TPU' maps to `tpu.json`.
@@ -72,9 +72,9 @@ class OrcaSlicerService:
         filament_profile_path = self._get_filament_profile_path(material_name)
 
         profiles = {
-            "machine": self.profiles_dir / "machine" / profile_config.machine,
+            "machine": self.profiles_dir / "machine" / profile_config.machine,  # type: ignore[union-attr]
             "filament": filament_profile_path,
-            "process": self.profiles_dir / "process" / profile_config.process,
+            "process": self.profiles_dir / "process" / profile_config.process,  # type: ignore[union-attr]
         }
 
         return {k: str(v.resolve()) for k, v in profiles.items()}
@@ -256,7 +256,7 @@ class OrcaSlicerService:
             async with aiofiles.open(json_path, encoding="utf-8") as f:
                 content = await f.read()
                 data = json.loads(content)
-                return data
+                return data  # type: ignore[no-any-return]
         except Exception:
             return None
 

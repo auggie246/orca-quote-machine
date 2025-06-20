@@ -95,7 +95,7 @@ class QuoteResponse(BaseModel):
     created_at: datetime
     processed_at: datetime | None = None
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def print_time_hours(self: "QuoteResponse") -> float:
         """Calculate hours from minutes."""
