@@ -36,6 +36,7 @@
       "Bash(ls:config/slicer_profiles/*)",
       "Bash(test:*)",
       "Bash(redis-cli:ping)",
+      "Bash(maturin develop:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:origin*)",
@@ -112,6 +113,10 @@
       "TEST_ENVIRONMENT_DETECTION": {
         "level": "warning",
         "description": "Ensures proper test environment detection using PYTEST_CURRENT_TEST patterns"
+      },
+      "INCORRECT_PYO3_INTEGRATION": {
+        "level": "error",
+        "description": "Detects PyO3 classes with conflicting Serde derives, explicit constructors, or missing factory functions"
       }
     }
   },
@@ -123,6 +128,10 @@
     "rust_calculation": {
       "description": "Pattern for CPU-bound operations: PyO3 bindings with panic handling",
       "required_components": ["rust_function", "pyo3_binding", "python_wrapper", "error_handling"]
+    },
+    "pyo3_object_creation": {
+      "description": "Pattern for creating PyO3 classes: Clean derives, factory functions, real object testing",
+      "required_components": ["clean_derives", "factory_function", "property_access", "real_object_tests"]
     }
   },
   "mcp_servers": {

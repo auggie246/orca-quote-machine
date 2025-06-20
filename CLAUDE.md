@@ -188,7 +188,66 @@ OrcaSlicer CLI → G-code Parsing → Pricing → Telegram Notification
 - Validate input data before passing to Rust
 - Handle memory allocation failures gracefully
 
-### 3. External CLI Integration Pattern
+### 3. PyO3 Object Creation Pattern
+**Use Case**: Creating PyO3 classes that can be used seamlessly between Rust and Python
+**Implementation**:
+1. **Class Definition**: Use `#[derive(Debug, Clone)]` only - avoid Serde derives that conflict with PyO3
+2. **No Explicit Constructor**: Let PyO3 handle automatic constructor generation
+3. **Factory Functions**: Create objects via Rust functions that return instances to Python
+4. **Property Access**: Use `#[pyo3(get)]` for field access from Python
+
+**Critical Requirements**:
+- **NEVER use `Serialize, Deserialize` derives** on `#[pyclass]` structs - they conflict with PyO3 constructor generation
+- **Avoid explicit `#[new]` methods** unless absolutely necessary - PyO3 auto-generation is preferred
+- **Create objects via functions**: Use Rust functions like `parse_slicer_output()` to create and return objects
+- **Test with real objects**: Never mock PyO3 objects in tests - use the actual Rust creation functions
+
+**Anti-Pattern Examples**:
+```rust
+// BAD: Conflicting derives prevent constructor generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[pyclass]
+pub struct SlicingResult { ... }
+
+// BAD: Explicit constructor often conflicts with auto-generation
+#[pymethods]
+impl SlicingResult {
+    #[new]
+    fn new(...) -> Self { ... }  // Often causes "No constructor defined" errors
+}
+```
+
+**Correct Pattern**:
+```rust
+// GOOD: Clean derives that work with PyO3
+#[derive(Debug, Clone)]
+#[pyclass]
+pub struct SlicingResult {
+    #[pyo3(get)]
+    pub print_time_minutes: u32,
+    // ...
+}
+
+// GOOD: Factory function approach
+#[pyfunction]
+fn parse_slicer_output(...) -> PyResult<SlicingResult> {
+    Ok(SlicingResult { ... })  // Created by Rust, returned to Python
+}
+```
+
+**Testing Pattern**:
+```python
+# GOOD: Use real Rust functions in tests
+async def create_real_slicing_result() -> SlicingResult:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create test data
+        return await parse_slicer_output(temp_dir)  # Real Rust function
+
+# BAD: Mocking PyO3 objects
+mock_result = MagicMock()  # Avoid this - use real Rust objects
+```
+
+### 4. External CLI Integration Pattern
 **Use Case**: OrcaSlicer subprocess execution
 **Implementation**:
 1. **Command Validation**: Verify CLI path and arguments
@@ -322,6 +381,7 @@ minimum = S$5.00
 - [ ] **MISSING_INPUT_VALIDATION**: All user inputs validated through Pydantic models
 - [ ] **INSECURE_FILENAME_HANDLING**: `secure_filename()` applied to user-provided names
 - [ ] **MISSING_TIMEOUT_PROTECTION**: External calls have reasonable timeout limits
+- [ ] **INCORRECT_PYO3_INTEGRATION**: PyO3 classes use `#[derive(Debug, Clone)]` only (no Serde), avoid explicit `#[new]`, use factory functions
 
 **MEDIUM PRIORITY - Code Quality:**
 - [ ] **MISSING_CELERY_IDEMPOTENCY**: Tasks can be safely re-executed
@@ -412,13 +472,20 @@ iostat -x 1                      # Disk I/O monitoring
 - **Test code logic**, not data validation already handled by Pydantic
 - **Simple assertions** - Test return types, structure, and key behaviors
 - **Avoid over-complication** - Don't test every possible input combination
-- **Mock external dependencies** - Keep tests fast and reliable
+- **Real objects over mocks for PyO3** - Use actual Rust functions to create objects in tests
+- **Mock external services only** - Keep tests fast and reliable by mocking I/O, not objects
+
+**PyO3 Testing Patterns - CRITICAL:**
+- **NEVER mock PyO3 objects** - Always use real Rust functions like `parse_slicer_output()`
+- **Use factory functions in tests** - Create real objects via Rust functions
+- **Test with actual Rust integration** - Verify the Python-Rust boundary works correctly
+- **Mock external I/O only** - Mock network calls, file systems, CLI processes - not Rust objects
 
 **What TO Test:**
-- Function return types and structure (`isinstance(result, dict)`)
-- Key business logic and calculations
-- Error handling and edge cases
-- Integration between components
+- Function return types and structure (`isinstance(result, CostBreakdown)`)
+- Key business logic and calculations using real Rust objects
+- Error handling and edge cases with real object creation
+- Integration between Python services and Rust components
 - Custom validation logic (not Pydantic validators)
 
 **What NOT to Test:**
@@ -427,32 +494,63 @@ iostat -x 1                      # Disk I/O monitoring
 - Different materials/inputs if logic is identical
 - Framework behavior (FastAPI, Celery internals)
 - Library functionality (requests, aiofiles, etc.)
+- **PyO3 object constructors directly** - Use factory functions instead
 
 **Test Structure Examples:**
 ```python
-# GOOD: Tests behavior
-def test_calculate_quote():
-    result = pricing_service.calculate_quote(slicing_result, material)
-    assert isinstance(result, dict)
-    assert "total_cost" in result
+# GOOD: Real Rust objects via factory functions
+async def create_real_slicing_result() -> SlicingResult:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        gcode_file = os.path.join(temp_dir, 'test.gcode')
+        with open(gcode_file, 'w') as f:  # noqa: ASYNC230  # Test file creation
+            f.write('; estimated printing time: 2h 0m\n; filament used: 100.0g\n')
+        return await parse_slicer_output(temp_dir)  # Real Rust function
 
-# BAD: Tests configuration values
+def test_calculate_quote():
+    slicing_result = asyncio.run(create_real_slicing_result())  # Real object
+    result = pricing_service.calculate_quote(slicing_result, MaterialType.PLA)
+    assert isinstance(result, CostBreakdown)  # Real Rust object
+    assert result.total_cost > 0
+
+# BAD: Mocking PyO3 objects
+def test_calculate_quote_bad():
+    mock_result = MagicMock()  # Don't do this for PyO3 objects
+    mock_result.print_time_minutes = 120
+    # This doesn't test the real Rust-Python integration
+
+# BAD: Testing configuration values
 def test_pla_price_is_25_dollars():
     assert settings.material_prices["PLA"] == 25.0  # Pydantic already validates this
 ```
 
 **Implementation Strategy:**
-- Mock OrcaSlicer CLI for unit tests (avoid actual slicing)
-- Test Rust validation with sample STL/OBJ/STEP files
-- Integration tests should verify complete pipeline without external dependencies
-- Use pytest fixtures for Redis and Celery test isolation
-- Test error scenarios: file corruption, CLI failures, network timeouts
+- **Always use real Rust objects** - Create via functions like `parse_slicer_output()`, `calculate_quote_rust()`
+- **Mock OrcaSlicer CLI process** - Avoid actual slicing but use real object creation
+- **Test Rust validation with real files** - Use sample STL/OBJ/STEP files with actual validation
+- **Integration tests verify real pipeline** - Real objects flowing through Python services
+- **Use pytest fixtures for environment** - Redis, Celery, file isolation - not object creation
+- **Test error scenarios with real objects** - File corruption, parsing failures with actual Rust
+
+**Real Object Creation Patterns:**
+```python
+# Create real SlicingResult via Rust parser
+async def create_slicing_result() -> SlicingResult:
+    return await parse_slicer_output(temp_dir_with_gcode)
+
+# Create real CostBreakdown via Rust pricing
+def create_cost_breakdown() -> CostBreakdown:
+    return calculate_quote_rust(120, 25.5, "PLA", 25.0, 0.5, 1.1, 5.0)
+
+# Create real CleanupStats via Rust cleanup
+def create_cleanup_stats() -> CleanupStats:
+    return cleanup_old_files_rust(upload_dir, 24)
+```
 
 **Refactoring Legacy Tests:**
-- If tests are checking values instead of logic, simplify them
-- Reduce complex test suites to essential behavior verification
-- Prefer focused tests over comprehensive value checking
-- Keep test count low but coverage meaningful
+- **Replace PyO3 mocks with real objects** - Use factory functions from Rust
+- **Simplify value checking** - Focus on behavior, not configuration
+- **Reduce mock complexity** - Only mock external I/O, never Rust objects
+- **Keep real object creation** - Tests should verify actual Rust-Python integration
 
 ## Task Management & Planning
 
