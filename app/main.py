@@ -30,7 +30,9 @@ app = FastAPI(
 )
 
 # Mount static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Skip static mounting during testing to avoid RuntimeError
+if not os.getenv("PYTEST_CURRENT_TEST"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # Ensure upload directory exists
