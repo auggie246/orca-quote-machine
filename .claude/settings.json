@@ -13,6 +13,9 @@
       "mcp__zen__debug",
       "mcp__zen__testgen",
       "mcp__zen__precommit",
+      "mcp__zen__consensus",
+      "mcp__zen__planner",
+      "mcp__zen__tracer",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(mkdir:*)",
@@ -30,6 +33,9 @@
       "Bash(pre-commit:*)",
       "Bash(rg:*)",
       "Bash(grep:*)",
+      "Bash(ls:config/slicer_profiles/*)",
+      "Bash(test:*)",
+      "Bash(redis-cli:ping)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:origin*)",
@@ -102,6 +108,10 @@
       "MISSING_FILE_CLEANUP": {
         "level": "warning",
         "description": "Ensures uploaded files are cleaned up in finally blocks"
+      },
+      "TEST_ENVIRONMENT_DETECTION": {
+        "level": "warning",
+        "description": "Ensures proper test environment detection using PYTEST_CURRENT_TEST patterns"
       }
     }
   },
@@ -141,6 +151,8 @@
         "mcp__zen__testgen",
         "mcp__zen__refactor",
         "mcp__zen__tracer",
+        "mcp__zen__consensus",
+        "mcp__zen__planner",
         "mcp__zen__version"
       ]
     },
