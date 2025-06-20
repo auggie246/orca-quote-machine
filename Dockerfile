@@ -55,7 +55,7 @@ COPY templates/ templates/
 COPY static/ static/
 COPY config/ config/
 COPY scripts/ scripts/
-COPY .env.example .env
+COPY example.env .env
 
 # Create directories
 RUN mkdir -p uploads logs

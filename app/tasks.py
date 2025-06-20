@@ -5,9 +5,10 @@ import contextlib
 import os
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
+# Import Rust functions
+from _rust_core import cleanup_old_files_rust, validate_3d_model
 from celery import Celery, Task
 from celery.utils.log import get_task_logger
 
@@ -16,15 +17,6 @@ from app.models.quote import MaterialType, TelegramMessage
 from app.services.pricing import PricingService
 from app.services.slicer import OrcaSlicerService
 from app.services.telegram import TelegramService
-
-# Import Rust validation functions
-try:
-    from _rust_core import validate_3d_model
-except ImportError:
-    print(
-        "Warning: Rust validation module not available. Install with 'maturin develop'"
-    )
-    validate_3d_model = None
 
 settings = get_settings()
 logger = get_task_logger(__name__)
@@ -87,12 +79,11 @@ def process_quote_request(
     logger.info(f"Processing quote {short_quote_id} for file {file_path}")
 
     try:
-        # Validate file using Rust if available
-        if validate_3d_model:
-            validation_result = validate_3d_model(file_path)
-            if not validation_result.is_valid:
-                raise Exception(f"Invalid 3D model: {validation_result.error_message}")
-            logger.info(f"File validation passed: {validation_result.file_type}")
+        # Validate file using Rust
+        validation_result = validate_3d_model(file_path)
+        if not validation_result.is_valid:
+            raise Exception(f"Invalid 3D model: {validation_result.error_message}")
+        logger.info(f"File validation passed: {validation_result.file_type}")
 
         # Parse material
         material_enum = None
@@ -156,7 +147,7 @@ async def run_processing_pipeline(
     # Calculate pricing
     pricing_service = PricingService()
     cost_breakdown = pricing_service.calculate_quote(slicing_result, material_enum)
-    logger.info(f"Pricing calculated: S${cost_breakdown['total_cost']:.2f}")
+    logger.info(f"Pricing calculated: S${cost_breakdown.total_cost:.2f}")
 
     # Send Telegram notification
     telegram_service = TelegramService()
@@ -169,7 +160,7 @@ async def run_processing_pipeline(
         filename=quote_data["filename"],
         print_time=f"{slicing_result.print_time_minutes // 60}h {slicing_result.print_time_minutes % 60}m",
         filament_weight=f"{slicing_result.filament_weight_grams:.1f}g",
-        total_cost=cost_breakdown["total_cost"],
+        total_cost=cost_breakdown.total_cost,
     )
 
     notification_sent = await telegram_service.send_quote_notification(telegram_message)
@@ -181,7 +172,13 @@ async def run_processing_pipeline(
             "print_time_minutes": slicing_result.print_time_minutes,
             "filament_weight_grams": slicing_result.filament_weight_grams,
         },
-        "cost_breakdown": cost_breakdown,
+        "cost_breakdown": {
+            "material_type": cost_breakdown.material_type,
+            "total_cost": cost_breakdown.total_cost,
+            "filament_kg": cost_breakdown.filament_kg,
+            "print_time_hours": cost_breakdown.print_time_hours,
+            "minimum_applied": cost_breakdown.minimum_applied,
+        },
         "notification_sent": notification_sent,
         "processed_at": datetime.utcnow().isoformat(),
     }
@@ -196,7 +193,7 @@ async def send_failure_notification(error_msg: str, quote_id: str) -> None:
 @celery_app.task
 def cleanup_old_files(max_age_hours: int = 24) -> dict[str, Any]:
     """
-    Cleanup old uploaded files.
+    Cleanup old uploaded files using high-performance Rust implementation.
 
     Args:
         max_age_hours: Maximum age of files to keep
@@ -204,30 +201,16 @@ def cleanup_old_files(max_age_hours: int = 24) -> dict[str, Any]:
     Returns:
         Cleanup statistics
     """
-    from datetime import timedelta
-
-    upload_dir = Path(settings.upload_dir)
-    cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
-
-    cleaned_count = 0
-    total_size = 0
-
     try:
-        for file_path in upload_dir.glob("*"):
-            if file_path.is_file():
-                file_time = datetime.fromtimestamp(file_path.stat().st_mtime)
-                if file_time < cutoff_time:
-                    file_size = file_path.stat().st_size
-                    file_path.unlink()
-                    cleaned_count += 1
-                    total_size += file_size
-                    logger.info(f"Cleaned up old file: {file_path}")
+        stats = cleanup_old_files_rust(settings.upload_dir, max_age_hours)
+        logger.info(
+            f"Cleaned up {stats.files_cleaned} old files, freeing {stats.bytes_freed} bytes."
+        )
 
         return {
             "success": True,
-            "files_cleaned": cleaned_count,
-            "bytes_freed": total_size,
-            "cutoff_time": cutoff_time.isoformat(),
+            "files_cleaned": stats.files_cleaned,
+            "bytes_freed": stats.bytes_freed,
         }
 
     except Exception as e:

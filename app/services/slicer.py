@@ -1,15 +1,15 @@
 """OrcaSlicer integration service."""
 
 import asyncio
-import json
 import os
 import tempfile
 from pathlib import Path
 
-import aiofiles
+# Import enhanced Rust functions
+from _rust_core import SlicingResult, parse_slicer_output
 
 from app.core.config import get_settings
-from app.models.quote import MaterialType, SlicingResult
+from app.models.quote import MaterialType
 
 
 class SlicerError(Exception):
@@ -160,131 +160,10 @@ class OrcaSlicerService:
                     error_msg = stderr.decode() if stderr else "Unknown slicer error"
                     raise SlicerError(f"Slicer failed: {error_msg}")
 
-                # Parse results
-                return await self._parse_slice_results(output_dir, stdout.decode())
+                # Parse results using Rust implementation
+                return await parse_slicer_output(str(output_dir))
 
             except TimeoutError as e:
                 raise SlicerError("Slicing operation timed out") from e
             except Exception as e:
                 raise SlicerError(f"Slicing failed: {str(e)}") from e
-
-    async def _parse_slice_results(
-        self, output_dir: Path, stdout: str
-    ) -> SlicingResult:
-        """
-        Parse slicing results from output directory and stdout.
-
-        This method will be updated once we understand the exact output format
-        from our PoC testing.
-        """
-        # TODO: Implement actual parsing based on PoC results
-        # For now, return placeholder values
-
-        # Look for common output files
-        gcode_files = list(output_dir.glob("*.gcode"))
-        json_files = list(output_dir.glob("*.json"))
-
-        if not gcode_files:
-            raise SlicerError("No G-code output found")
-
-        # Parse G-code comments for print info (common location)
-        gcode_path = gcode_files[0]
-        print_time_minutes, filament_grams = await self._parse_gcode_metadata(
-            gcode_path
-        )
-
-        # Try to parse from JSON files if available
-        if json_files:
-            json_data = await self._parse_json_metadata(json_files[0])
-            if json_data:
-                print_time_minutes = json_data.get(
-                    "print_time_minutes", print_time_minutes
-                )
-                filament_grams = json_data.get("filament_grams", filament_grams)
-
-        return SlicingResult(
-            print_time_minutes=print_time_minutes,
-            filament_weight_grams=filament_grams,
-            layer_count=None,  # TODO: Extract from results
-        )
-
-    async def _parse_gcode_metadata(self, gcode_path: Path) -> tuple[int, float]:
-        """Parse print time and filament usage from G-code comments."""
-        print_time_minutes = 0
-        filament_grams = 0.0
-
-        try:
-            async with aiofiles.open(gcode_path, encoding="utf-8") as f:
-                # Read first 100 lines where metadata is typically located
-                for _ in range(100):
-                    line = await f.readline()
-                    if not line:
-                        break
-
-                    line = line.strip()
-
-                    # Common G-code comment patterns for print time
-                    if "; estimated printing time" in line.lower():
-                        # Parse time formats like "1h 30m", "90m", etc.
-                        time_str = line.split(":")[-1].strip()
-                        print_time_minutes = self._parse_time_string(time_str)
-
-                    # Common patterns for filament usage
-                    elif (
-                        "; filament used" in line.lower()
-                        or "; material volume" in line.lower()
-                    ):
-                        # Parse weight/volume information
-                        if "g" in line or "gram" in line:
-                            import re
-
-                            match = re.search(r"(\d+\.?\d*)\s*g", line)
-                            if match:
-                                filament_grams = float(match.group(1))
-
-        except Exception as e:
-            # Fallback values if parsing fails
-            print(f"Warning: Could not parse G-code metadata: {e}")
-            print_time_minutes = 60  # 1 hour default
-            filament_grams = 20.0  # 20g default
-
-        return print_time_minutes, filament_grams
-
-    async def _parse_json_metadata(self, json_path: Path) -> dict | None:
-        """Parse metadata from JSON output files."""
-        try:
-            async with aiofiles.open(json_path, encoding="utf-8") as f:
-                content = await f.read()
-                data = json.loads(content)
-                return data  # type: ignore[no-any-return]
-        except Exception:
-            return None
-
-    def _parse_time_string(self, time_str: str) -> int:
-        """Parse time string to minutes."""
-        import re
-
-        # Remove common prefixes and clean up
-        time_str = re.sub(
-            r"(estimated|printing|time|:)", "", time_str, flags=re.IGNORECASE
-        )
-        time_str = time_str.strip()
-
-        minutes = 0
-
-        # Parse "1h 30m" format
-        hour_match = re.search(r"(\d+)h", time_str)
-        minute_match = re.search(r"(\d+)m", time_str)
-
-        if hour_match:
-            minutes += int(hour_match.group(1)) * 60
-        if minute_match:
-            minutes += int(minute_match.group(1))
-
-        # Parse "90m" format (minutes only)
-        if not hour_match and not minute_match:
-            minute_only = re.search(r"(\d+)", time_str)
-            if minute_only:
-                minutes = int(minute_only.group(1))
-
-        return minutes or 60  # Default to 1 hour if parsing fails

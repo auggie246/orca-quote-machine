@@ -51,7 +51,7 @@ A web application for generating 3D printing quotations using OrcaSlicer CLI int
 
 2. **Configure environment:**
    ```bash
-   cp .env.example .env
+   cp example.env .env
    # Edit .env with your settings
    ```
 

@@ -14,14 +14,14 @@ class SlicerProfileSettings(BaseModel):
     base_dir: Path = Path("config/slicer_profiles")
 
     # Default machine and process profiles
-    machine: str = "default_machine.json"
-    process: str = "standard_0.2mm.json"
+    machine: str = "RatRig V-Core 3 400 0.5 nozzle.json"
+    process: str = "0.2mm RatRig 0.5mm nozzle.json"
 
     # Per-material filament profiles for official materials
     # These act as overrides for the default file-based convention
-    filament_pla: str = "pla.json"
-    filament_petg: str = "petg.json"
-    filament_asa: str = "asa.json"
+    filament_pla: str = "ALT TABL MATTE PLA PEI.json"
+    filament_petg: str = "Alt Tab PETG.json"
+    filament_asa: str = "fusrock ASA.json"
 
     @model_validator(mode="after")
     def validate_profiles_exist(self) -> "SlicerProfileSettings":
