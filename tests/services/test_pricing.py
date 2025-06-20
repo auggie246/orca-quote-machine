@@ -4,7 +4,8 @@ import asyncio
 import os
 import tempfile
 
-from _rust_core import CostBreakdown, parse_slicer_output
+from _rust_core import CostBreakdown, SlicingResult, parse_slicer_output
+
 from app.models.quote import MaterialType
 from app.services.pricing import PricingService
 
@@ -16,13 +17,13 @@ class TestPricingService:
         """Test that calculate_quote returns correct structure and applies business logic."""
         service = PricingService()
 
-        # Create a mock slicing result using the Rust parser
-        async def create_slicing_result():
+        # Create a real slicing result using the Rust parser
+        async def create_slicing_result() -> SlicingResult:
             with tempfile.TemporaryDirectory() as temp_dir:
                 gcode_file = os.path.join(temp_dir, 'test.gcode')
-                with open(gcode_file, 'w') as f:
+                with open(gcode_file, 'w') as f:  # noqa: ASYNC230  # Test file creation
                     f.write('; estimated printing time: 2h 0m\n; filament used: 100.0g\n')
-                
+
                 return await parse_slicer_output(temp_dir)
 
         slicing_result = asyncio.run(create_slicing_result())
@@ -43,12 +44,12 @@ class TestPricingService:
         service = PricingService()
 
         # Create a real CostBreakdown using the actual pricing logic
-        async def create_slicing_result():
+        async def create_slicing_result() -> SlicingResult:
             with tempfile.TemporaryDirectory() as temp_dir:
                 gcode_file = os.path.join(temp_dir, 'test.gcode')
-                with open(gcode_file, 'w') as f:
+                with open(gcode_file, 'w') as f:  # noqa: ASYNC230  # Test file creation
                     f.write('; estimated printing time: 2h 0m\n; filament used: 100.0g\n')
-                
+
                 return await parse_slicer_output(temp_dir)
 
         slicing_result = asyncio.run(create_slicing_result())

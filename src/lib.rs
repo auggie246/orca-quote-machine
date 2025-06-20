@@ -1,7 +1,6 @@
 use pyo3::prelude::*;
 use pyo3_asyncio::tokio::future_into_py;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -278,7 +277,7 @@ fn validate_3d_model(file_path: String) -> PyResult<ModelInfo> {
 }
 
 /// Enhanced slicing result with performance-critical calculations in Rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[pyclass]
 pub struct SlicingResult {
     #[pyo3(get)]
@@ -291,20 +290,6 @@ pub struct SlicingResult {
 
 #[pymethods]
 impl SlicingResult {
-    #[staticmethod]
-    #[pyo3(signature = (print_time_minutes, filament_weight_grams, layer_count=None))]
-    fn create(
-        print_time_minutes: u32,
-        filament_weight_grams: f32,
-        layer_count: Option<u32>,
-    ) -> Self {
-        Self {
-            print_time_minutes,
-            filament_weight_grams,
-            layer_count,
-        }
-    }
-
     fn __str__(&self) -> String {
         format!(
             "SlicingResult(time={}min, filament={:.1}g, layers={:?})",
