@@ -10,7 +10,7 @@ from app.models.quote import TelegramMessage
 class TelegramService:
     """Service for sending notifications via Telegram bot."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = get_settings()
         self.bot: Bot | None = None
 

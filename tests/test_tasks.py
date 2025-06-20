@@ -5,8 +5,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.models.quote import MaterialType, SlicingResult
-from app.tasks import (cleanup_old_files, process_quote_request,
-                       run_processing_pipeline, send_failure_notification)
+from app.tasks import (
+    cleanup_old_files,
+    process_quote_request,
+    run_processing_pipeline,
+    send_failure_notification,
+)
 
 
 class TestTasks:
@@ -15,7 +19,9 @@ class TestTasks:
     @patch("app.tasks.asyncio.run")
     @patch("app.tasks.validate_3d_model", None)
     @patch("app.tasks.os.path.exists", return_value=False)
-    def test_process_quote_request(self, mock_exists: MagicMock, mock_asyncio_run: MagicMock) -> None:
+    def test_process_quote_request(
+        self, mock_exists: MagicMock, mock_asyncio_run: MagicMock
+    ) -> None:
         """Test process_quote_request task function."""
         mock_asyncio_run.return_value = {"success": True, "total_cost": 25.50}
 

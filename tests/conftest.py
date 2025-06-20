@@ -15,6 +15,7 @@ os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
 os.environ["CELERY_TASK_EAGER_PROPAGATES"] = "True"
 os.environ["PYTEST_CURRENT_TEST"] = "conftest.py"
 os.environ["MAX_FILE_SIZE"] = "104857600"
+os.environ["SECRET_KEY"] = "test-secret-key-for-pytest"
 
 from app.core.config import get_settings
 from app.main import app

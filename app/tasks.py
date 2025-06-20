@@ -29,20 +29,41 @@ except ImportError:
 settings = get_settings()
 logger = get_task_logger(__name__)
 
-# Initialize Celery
-celery_app = Celery(
-    "orca_quote_machine",
-    broker=settings.celery_broker_url,
-    backend=settings.celery_result_backend,
-)
+# Initialize Celery with test-aware configuration
+if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("CELERY_TASK_ALWAYS_EAGER"):
+    # Use in-memory broker for testing
+    celery_app = Celery(
+        "orca_quote_machine",
+        broker="memory://",
+        backend="rpc://",
+    )
+else:
+    # Use Redis for production
+    celery_app = Celery(
+        "orca_quote_machine",
+        broker=settings.celery_broker_url,
+        backend=settings.celery_result_backend,
+    )
 
-celery_app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
-)
+# Configure Celery settings
+celery_config = {
+    "task_serializer": "json",
+    "accept_content": ["json"],
+    "result_serializer": "json",
+    "timezone": "UTC",
+    "enable_utc": True,
+}
+
+# Add eager mode for testing
+if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("CELERY_TASK_ALWAYS_EAGER"):
+    celery_config.update(
+        {
+            "task_always_eager": True,
+            "task_eager_propagates": True,
+        }
+    )
+
+celery_app.conf.update(**celery_config)
 
 
 @celery_app.task(bind=True)

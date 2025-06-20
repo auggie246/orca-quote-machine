@@ -5,8 +5,14 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from app.models.quote import (MaterialType, QuoteRequest, QuoteResponse,
-                              QuoteStatus, SlicingResult, TelegramMessage)
+from app.models.quote import (
+    MaterialType,
+    QuoteRequest,
+    QuoteResponse,
+    QuoteStatus,
+    SlicingResult,
+    TelegramMessage,
+)
 
 
 class TestMaterialType:
