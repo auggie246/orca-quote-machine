@@ -166,9 +166,9 @@ class TestSlicerProfileSettings:
         with patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "true"}):
             slicer_settings = SlicerProfileSettings()
 
-            # Test our default choices
-            assert slicer_settings.machine == "default_machine.json"
-            assert slicer_settings.process == "standard_0.2mm.json"
-            assert slicer_settings.filament_pla == "pla.json"
-            assert slicer_settings.filament_petg == "petg.json"
-            assert slicer_settings.filament_asa == "asa.json"
+            # Test our updated default choices that match actual files
+            assert slicer_settings.machine == "RatRig V-Core 3 400 0.5 nozzle.json"
+            assert slicer_settings.process == "0.25mm RatRig 0.5mm nozzle - slower.json"
+            assert slicer_settings.filament_pla == "Alt Tab PLA+.json"
+            assert slicer_settings.filament_petg == "Polymaker PETG PEI.json"
+            assert slicer_settings.filament_asa == "fusrock ASA G11.json"

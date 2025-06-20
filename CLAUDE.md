@@ -22,7 +22,7 @@ Before ANY git operation, Claude MUST:
 
 ## Environment Variables Pattern
 - **Local Development**: All secrets stored in `.env` file (NEVER committed)
-- **Template**: Use `.env.example` with empty/placeholder values (safe to commit)
+- **Template**: Use `example.env` with empty/placeholder values (safe to commit)
 - **Production**: Secrets injected at runtime via hosting platform (not files)
 
 ## Automated Security Safeguards

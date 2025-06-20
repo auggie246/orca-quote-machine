@@ -28,7 +28,7 @@ mkdir -p uploads static config/slicer_profiles/{machine,filament,process}
 
 echo "Setting up environment file..."
 if [ ! -f .env ]; then
-    cp .env.example .env
+    cp example.env .env
     echo "Please edit .env with your configuration"
 else
     echo ".env already exists"
