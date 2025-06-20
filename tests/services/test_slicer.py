@@ -29,14 +29,3 @@ class TestOrcaSlicerService:
         assert len(result) > 0
         assert all(isinstance(material, str) for material in result)
 
-    def test_parse_time_string(self):
-        """Test that _parse_time_string converts time strings to minutes."""
-        service = OrcaSlicerService()
-
-        # Test normal cases
-        assert service._parse_time_string("2h 30m") == 150
-        assert service._parse_time_string("1h 0m") == 60
-        assert service._parse_time_string("30m") == 30
-
-        # Test fallback
-        assert service._parse_time_string("invalid") == 60

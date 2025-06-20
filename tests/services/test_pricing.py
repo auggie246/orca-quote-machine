@@ -1,6 +1,11 @@
 """Unit tests for pricing service."""
 
-from app.models.quote import MaterialType, SlicingResult
+import asyncio
+import os
+import tempfile
+
+from _rust_core import CostBreakdown, parse_slicer_output
+from app.models.quote import MaterialType
 from app.services.pricing import PricingService
 
 
@@ -11,38 +16,43 @@ class TestPricingService:
         """Test that calculate_quote returns correct structure and applies business logic."""
         service = PricingService()
 
-        slicing_result = SlicingResult(
-            print_time_minutes=120, filament_weight_grams=100.0
-        )
+        # Create a mock slicing result using the Rust parser
+        async def create_slicing_result():
+            with tempfile.TemporaryDirectory() as temp_dir:
+                gcode_file = os.path.join(temp_dir, 'test.gcode')
+                with open(gcode_file, 'w') as f:
+                    f.write('; estimated printing time: 2h 0m\n; filament used: 100.0g\n')
+                
+                return await parse_slicer_output(temp_dir)
 
+        slicing_result = asyncio.run(create_slicing_result())
         result = service.calculate_quote(slicing_result, MaterialType.PLA)
 
         # Test structure
-        assert isinstance(result, dict)
-        assert "total_cost" in result
-        assert "material_cost" in result
-        assert "time_cost" in result
+        assert isinstance(result, CostBreakdown)
+        assert hasattr(result, 'total_cost')
+        assert hasattr(result, 'material_cost')
+        assert hasattr(result, 'time_cost')
 
         # Test business logic
-        assert result["total_cost"] >= 5.0  # Minimum price
-        assert result["total_cost"] > 0
+        assert result.total_cost >= 5.0  # Minimum price
+        assert result.total_cost > 0
 
     def test_format_cost_summary(self):
         """Test that format_cost_summary returns a string."""
         service = PricingService()
 
-        cost_breakdown = {
-            "filament_grams": 100.0,
-            "filament_kg": 0.1,
-            "price_per_kg": 25.0,
-            "material_cost": 2.5,
-            "print_time_hours": 2.5,
-            "time_cost": 5.0,
-            "subtotal": 8.25,
-            "total_cost": 8.25,
-            "markup_percentage": 10.0,
-            "minimum_applied": False,
-        }
+        # Create a real CostBreakdown using the actual pricing logic
+        async def create_slicing_result():
+            with tempfile.TemporaryDirectory() as temp_dir:
+                gcode_file = os.path.join(temp_dir, 'test.gcode')
+                with open(gcode_file, 'w') as f:
+                    f.write('; estimated printing time: 2h 0m\n; filament used: 100.0g\n')
+                
+                return await parse_slicer_output(temp_dir)
+
+        slicing_result = asyncio.run(create_slicing_result())
+        cost_breakdown = service.calculate_quote(slicing_result, MaterialType.PLA)
 
         result = service.format_cost_summary(cost_breakdown)
 
