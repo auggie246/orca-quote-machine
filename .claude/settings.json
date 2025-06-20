@@ -29,7 +29,12 @@
       "Bash(git reset:HEAD*)",
       "Bash(pre-commit:*)",
       "Bash(rg:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:origin*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr edit:*)"
     ],
     "deny": [
       "Bash(git add:.)",

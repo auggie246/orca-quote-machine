@@ -385,12 +385,120 @@ htop                              # CPU and memory usage
 iostat -x 1                      # Disk I/O monitoring
 ```
 
-**Testing Strategy:**
+**Testing Philosophy:**
+- **"1 test per function, test code logic only"** - Focus on behavior, not configuration values
+- **Test code logic**, not data validation already handled by Pydantic
+- **Simple assertions** - Test return types, structure, and key behaviors
+- **Avoid over-complication** - Don't test every possible input combination
+- **Mock external dependencies** - Keep tests fast and reliable
+
+**What TO Test:**
+- Function return types and structure (`isinstance(result, dict)`)
+- Key business logic and calculations
+- Error handling and edge cases
+- Integration between components
+- Custom validation logic (not Pydantic validators)
+
+**What NOT to Test:**
+- Configuration values (Pydantic handles validation)
+- External service responses (mock them)
+- Different materials/inputs if logic is identical
+- Framework behavior (FastAPI, Celery internals)
+- Library functionality (requests, aiofiles, etc.)
+
+**Test Structure Examples:**
+```python
+# GOOD: Tests behavior
+def test_calculate_quote():
+    result = pricing_service.calculate_quote(slicing_result, material)
+    assert isinstance(result, dict)
+    assert "total_cost" in result
+
+# BAD: Tests configuration values
+def test_pla_price_is_25_dollars():
+    assert settings.material_prices["PLA"] == 25.0  # Pydantic already validates this
+```
+
+**Implementation Strategy:**
 - Mock OrcaSlicer CLI for unit tests (avoid actual slicing)
 - Test Rust validation with sample STL/OBJ/STEP files
 - Integration tests should verify complete pipeline without external dependencies
 - Use pytest fixtures for Redis and Celery test isolation
 - Test error scenarios: file corruption, CLI failures, network timeouts
+
+**Refactoring Legacy Tests:**
+- If tests are checking values instead of logic, simplify them
+- Reduce complex test suites to essential behavior verification
+- Prefer focused tests over comprehensive value checking
+- Keep test count low but coverage meaningful
+
+## Task Management & Planning
+
+**When to Use TodoWrite/TodoRead:**
+- **Complex multi-step tasks** (3+ distinct steps or operations)
+- **Non-trivial implementation work** requiring careful planning
+- **User provides multiple tasks** (numbered lists, comma-separated requests)
+- **After receiving new complex instructions** to capture all requirements
+- **When starting work on a task** (mark as in_progress BEFORE beginning)
+- **After completing a task** (mark as completed and add discovered follow-ups)
+
+**Task Structure Best Practices:**
+- **One todo per function/component** being implemented or fixed
+- **Specific, actionable items** with clear completion criteria
+- **Break complex tasks** into smaller, manageable steps
+- **Priority levels**: high (blocking), medium (important), low (nice-to-have)
+- **Only ONE task in_progress** at any time for focus
+
+**Task Management Workflow:**
+1. **Read existing todos** with TodoRead to understand current state
+2. **Plan the work** by creating specific, actionable todos
+3. **Mark in_progress** before starting work on a task
+4. **Update status** as work progresses (complete immediately after finishing)
+5. **Add new tasks** discovered during implementation
+6. **Clean up completed** tasks periodically
+
+**When NOT to Use:**
+- Single, straightforward tasks (can be completed in 1-2 trivial steps)
+- Purely conversational or informational requests
+- Tasks that provide no organizational benefit
+
+This system demonstrates thoroughness and helps users track progress on complex requests.
+
+## Advanced Analysis Tools
+
+**Tool Selection Criteria:**
+- **mcp__zen__thinkdeep**: Deep architectural decisions, complex problem analysis, validation of approaches
+- **mcp__zen__codereview**: Comprehensive code analysis, security audits, architectural validation
+- **mcp__zen__debug**: Root cause analysis, tracing complex issues, error investigation
+- **mcp__zen__analyze**: General file/code exploration, dependency analysis, pattern detection
+- **mcp__zen__chat**: Brainstorming, second opinions, collaborative thinking, concept explanations
+- **mcp__zen__precommit**: Pre-commit validation, change analysis, safety checks
+
+**Thinking Mode Guidelines:**
+- **minimal**: Quick checks, simple confirmations
+- **low**: Standard debugging, basic analysis
+- **medium**: Normal problem solving, code review
+- **high**: Complex architectural decisions, security analysis (default for this project)
+- **max**: Critical systems, extremely complex challenges
+
+**When to Use Advanced Tools:**
+- **Complex Problems**: Use thinkdeep for multi-faceted architectural challenges
+- **Security Concerns**: Always use precommit before any git operations
+- **Code Quality**: Use codereview for comprehensive analysis of new features
+- **Debugging Issues**: Use debug tool with comprehensive file context (include logs, stack traces)
+- **Brainstorming**: Use chat for exploring alternatives and validating approaches
+- **Validation**: Use analyze for understanding existing code structure
+
+**Tool Combinations:**
+- **Planning Phase**: chat → thinkdeep → analyze (explore → validate → understand)
+- **Implementation**: codereview → debug → precommit (quality → troubleshoot → validate)
+- **Problem Solving**: debug → thinkdeep → chat (investigate → analyze → explore solutions)
+
+**File Context Strategy:**
+- **Include liberally**: These tools can handle large amounts of context
+- **Related files**: Include all files that might be relevant to the analysis
+- **Diagnostic data**: Include logs, stack traces, error outputs for debugging
+- **Configuration files**: Include settings and config when analyzing system behavior
 
 ## Claude Behavior Guidelines
 
