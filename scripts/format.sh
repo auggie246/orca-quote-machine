@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Formatting code with black and isort"
+echo "Formatting code with ruff"
 
 # Check if uv environment exists
 if [ ! -d ".venv" ]; then
@@ -9,11 +9,11 @@ if [ ! -d ".venv" ]; then
     exit 1
 fi
 
-echo "Running black..."
-uv run black .
+echo "Running ruff linting..."
+uv run ruff check --fix .
 
-echo "Running isort..."
-uv run isort .
+echo "Running ruff formatting..."
+uv run ruff format .
 
 echo "Running mypy type checks..."
 uv run mypy app/ --ignore-missing-imports

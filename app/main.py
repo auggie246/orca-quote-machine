@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
-from fastapi import (FastAPI, File, Form, HTTPException, Request, UploadFile,
-                     status)
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates

@@ -1,7 +1,5 @@
 """Unit tests for telegram service."""
 
-from unittest.mock import patch
-
 from app.models.quote import TelegramMessage
 from app.services.telegram import TelegramService
 
