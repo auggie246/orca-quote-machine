@@ -64,7 +64,7 @@ If a secret is accidentally committed:
 ```bash
 # 1. Verify core services
 redis-cli ping                           # Expected: PONG
-uv run python -c "from _rust_core import validate_3d_model; print('Rust OK')"  # Expected: "Rust OK"
+uv run python -c "from _rust_core import validate_filename; print('Rust OK')"  # Expected: "Rust OK"
 
 # 2. Verify OrcaSlicer integration
 ls -la $ORCASLICER_CLI_PATH             # Expected: executable file
@@ -72,7 +72,7 @@ ls config/slicer_profiles/{machine,filament,process}/  # Expected: profile files
 
 # 3. Verify development environment
 uv run pytest --collect-only tests/    # Expected: X tests collected
-uv run ruff check app tests           # Expected: All checks passed
+uv run ruff check src tests           # Expected: All checks passed
 ```
 
 **Claude Behavior Guidelines:**
@@ -97,7 +97,7 @@ uv run ruff check app tests           # Expected: All checks passed
 uv sync --group dev             # Install dependencies
 maturin develop                 # Build Rust components
 uv run pytest -xvs tests/      # Run specific tests
-uv run celery -A app.tasks worker --loglevel=debug  # Debug worker
+uv run celery -A src.orca_quote_machine.tasks worker --loglevel=debug  # Debug worker
 redis-cli ping                 # Verify Redis connection
 ```
 
@@ -141,19 +141,70 @@ uv sync --frozen                 # Install exact versions from lock file (CI/pro
 
 ## Repository Structure & Architecture
 
-For detailed information about the repository structure, system architecture, components, and implementation patterns, refer to:
+### Rust-First Architecture (Code Review 3 Implementation)
+
+**Core Philosophy**: Maximum simplification with Rust handling all business logic while Python provides a thin orchestration layer.
+
+**Architecture Principles:**
+1. **SIMPLICITY FIRST**: Remove unnecessary complexity, consolidate duplicate logic
+2. **RUST-FIRST**: Move all computational and business logic to Rust
+3. **MODULAR FUNCTIONS**: Each function does ONE thing, easily testable
+4. **PYTHON AS GLUE**: Python only handles HTTP, configuration, and external services
+5. **PRACTICAL ARCHITECTURE**: Keep Celery for robustness but simplify its usage
+
+**Layer Responsibilities:**
+```
+Python (FastAPI)                   Rust (PyO3)
+────────────────                   ─────────────
+- HTTP request handling            - ALL file validation (STL/OBJ/STEP)
+- Request/response routing         - Filename sanitization
+- Celery task orchestration       - G-code parsing and analysis
+- External service calls only      - Price calculation and logic
+                                  - Cost formatting
+                                  - File cleanup operations
+                                  - Profile resolution
+                                  - Error handling with custom types
+```
+
+**Simplified Request Flow:**
+```
+1. FastAPI receives upload request → basic validation only
+2. Queue Celery task with file contents
+3. Celery task calls Rust `run_quote_pipeline()` function
+4. Rust handles entire pipeline:
+   - Validate filename (secure_filename)
+   - Validate 3D model content
+   - Save to temp directory
+   - Resolve slicer profiles
+   - Execute OrcaSlicer CLI
+   - Parse G-code output
+   - Calculate pricing
+   - Format results
+   - Send notifications (if configured)
+   - Clean up files
+5. Return complete QuoteResult with all data
+6. Python returns formatted response
+```
+
+**Key Rust Functions:**
+- `run_quote_pipeline()`: Main orchestration function containing all business logic
+- `validate_filename()`: Sanitize user input filenames
+- `validate_3d_file()`: Validate file contents by type
+- `execute_slicer()`: Run OrcaSlicer with proper error handling
+- `parse_gcode_metadata()`: Extract timing and material data
+- `calculate_final_quote()`: Apply pricing rules
+- `discover_available_materials()`: Find materials from profiles
+- `resolve_profile_paths()`: Map material to profile files
+
+**Modular Design Pattern:**
+Each Rust function is:
+- Single-purpose (does ONE thing)
+- Pure when possible (no side effects)
+- Testable in isolation
+- Returns proper error types
+
+For detailed legacy information and original structure, refer to:
 `ai_docs/orca-quote-machine-repomix.xml`
-
-This XML file contains:
-- Complete directory structure
-- All source code files
-- System architecture details
-- Component relationships
-- Implementation patterns
-- Configuration examples
-- Security requirements
-
-The XML file is automatically generated and provides a comprehensive view of the entire codebase in a format optimized for AI analysis.
 
 ## Code Quality & Linting
 
@@ -173,8 +224,8 @@ The XML file is automatically generated and provides a comprehensive view of the
 - **Type Checking**: MyPy configured for strict type checking with `disallow_untyped_defs`
 
 **Rule Modification Process:**
-1. Test rule changes locally with `uv run ruff check app tests`
-2. Verify formatting compatibility with `uv run ruff format app tests`
+1. Test rule changes locally with `uv run ruff check src tests`
+2. Verify formatting compatibility with `uv run ruff format src tests`
 3. Update CI if adding new rule categories
 4. Document rationale for ignored rules in pyproject.toml comments
 
@@ -212,6 +263,54 @@ The XML file is automatically generated and provides a comprehensive view of the
 - Python file operations use chunked reading
 - OrcaSlicer timeout protection (default 5 minutes)
 
+**Common Rust-PyO3 Patterns:**
+
+**Error Type Implementation:**
+```rust
+// GOOD: Single From implementation
+impl From<OrcaError> for PyErr {
+    fn from(err: OrcaError) -> PyErr {
+        match err {
+            OrcaError::InvalidFile { msg } => PyValueError::new_err(msg),
+            // ... handle each variant
+        }
+    }
+}
+
+// BAD: Duplicate implementations cause compilation errors
+```
+
+**PyO3 Function Signatures:**
+```rust
+// GOOD: No py parameter for most functions
+#[pyfunction]
+fn validate_filename(filename: &str) -> PyResult<String>
+
+// BAD: Unused py parameter
+#[pyfunction]
+fn validate_filename(py: Python, filename: &str) -> PyResult<String>
+```
+
+**PyO3 Class Requirements:**
+```rust
+// Required for Python-accessible classes
+#[pyclass]
+pub struct TelegramConfig { ... }
+
+#[pymethods]  // Don't forget this!
+impl TelegramConfig {
+    #[new]
+    fn new(...) -> Self { ... }
+}
+```
+
+**Module Registration:**
+```rust
+// Only register types exposed to Python
+m.add_class::<TelegramConfig>()?;  // Has #[pyclass]
+// Don't register internal structs like PricingConfig
+```
+
 **Error Handling Patterns:**
 - Rust components have graceful fallback when unavailable
 - Telegram notifications have error capture for debugging
@@ -222,17 +321,17 @@ The XML file is automatically generated and provides a comprehensive view of the
 **Debugging Async/Celery Issues:**
 ```bash
 # Check Celery worker status and active tasks
-uv run celery -A app.tasks inspect active
-uv run celery -A app.tasks inspect stats
+uv run celery -A src.orca_quote_machine.tasks inspect active
+uv run celery -A src.orca_quote_machine.tasks inspect stats
 
 # Debug worker with verbose logging
-uv run celery -A app.tasks worker --loglevel=debug --concurrency=1
+uv run celery -A src.orca_quote_machine.tasks worker --loglevel=debug --concurrency=1
 
 # Monitor task execution in real-time
-uv run celery -A app.tasks events
+uv run celery -A src.orca_quote_machine.tasks events
 
 # Clear failed tasks from queue
-uv run celery -A app.tasks purge
+uv run celery -A src.orca_quote_machine.tasks purge
 ```
 
 **Common OrcaSlicer Problems:**
@@ -253,7 +352,7 @@ redis-cli monitor                 # Real-time command monitoring
 redis-cli --latency              # Check connection latency
 
 # Check Celery broker connection
-uv run python -c "from app.tasks import app; print(app.control.inspect().stats())"
+uv run python -c "from src.orca_quote_machine.tasks import app; print(app.control.inspect().stats())"
 ```
 
 **File Upload Error Patterns:**
@@ -266,24 +365,25 @@ uv run python -c "from app.tasks import app; print(app.control.inspect().stats()
 **Performance Debugging:**
 ```bash
 # Profile async operations
-uv run python -m cProfile -s cumulative app/main.py
+uv run python -m cProfile -s cumulative src/orca_quote_machine/main.py
 
 # Monitor Celery task performance
-uv run celery -A app.tasks inspect active_queues
-uv run celery -A app.tasks inspect reserved
+uv run celery -A src.orca_quote_machine.tasks inspect active_queues
+uv run celery -A src.orca_quote_machine.tasks inspect reserved
 
 # Check system resources during processing
 htop                              # CPU and memory usage
 iostat -x 1                      # Disk I/O monitoring
 ```
 
-**Testing Philosophy:**
-- **"1 test per function, test code logic only"** - Focus on behavior, not configuration values
+**Testing Philosophy (Code Review 3):**
+- **"1 test per function, test code logic only"** - Each modular Rust function gets ONE focused test
 - **Test code logic**, not data validation already handled by Pydantic
-- **Simple assertions** - Test return types, structure, and key behaviors
+- **Simple assertions** - Test return types, structure, and key behaviors (tests should be <10 lines)
 - **Avoid over-complication** - Don't test every possible input combination
 - **Real objects over mocks for PyO3** - Use actual Rust functions to create objects in tests
-- **Mock external services only** - Keep tests fast and reliable by mocking I/O, not objects
+- **Mock external services only** - Keep tests fast by mocking OrcaSlicer CLI, Telegram API, not objects
+- **Modular test structure** - Separate Rust tests (src/), Python tests (tests/)
 
 **PyO3 Testing Patterns - CRITICAL:**
 - **NEVER mock PyO3 objects** - Always use real Rust functions like `parse_slicer_output()`
@@ -392,6 +492,33 @@ def create_cleanup_stats() -> CleanupStats:
 - Purely conversational or informational requests
 - Tasks that provide no organizational benefit
 
+**Phase-Based Project Management:**
+
+For multi-phase projects (like code-review-3 implementation):
+1. **Create phase-level parent tasks** with clear milestones
+2. **Break each phase into subtasks** before starting work
+3. **Track phase completion** separately from individual tasks
+4. **Update implementation status** in CLAUDE.md after each phase
+
+**Example Structure:**
+```
+- Phase 1: Rust Consolidation (HIGH)
+  - Create run_quote_pipeline function
+  - Add modular helper functions
+  - Implement error handling
+  - Test Rust implementation
+- Phase 2: Python Simplification (MEDIUM)
+  - Update main.py endpoints
+  - Simplify tasks.py
+  - Remove service layer
+```
+
+**Phase Transition Protocol:**
+- Complete all subtasks in current phase
+- Update CLAUDE.md implementation status
+- Review next phase requirements
+- Create new task set for next phase
+
 This system demonstrates thoroughness and helps users track progress on complex requests.
 
 ## Technical Debt Management
@@ -414,7 +541,7 @@ This system demonstrates thoroughness and helps users track progress on complex 
 - **[ARCH]**: Architectural improvements
 
 **Debt Resolution Workflow:**
-1. **Inventory Phase**: Use `grep -r "TODO-DEBT" app/ tests/` to list all tracked debt
+1. **Inventory Phase**: Use `grep -r "TODO-DEBT" src/ tests/` to list all tracked debt
 2. **Prioritization**: HIGH = blocks production, MEDIUM = affects maintainability, LOW = future improvements
 3. **Resolution**: Address in order: HIGH → MEDIUM → LOW within same category
 4. **Validation**: Use `mcp__zen__codereview` for complex debt resolution
@@ -422,9 +549,9 @@ This system demonstrates thoroughness and helps users track progress on complex 
 **Monthly Debt Review Process:**
 ```bash
 # Generate debt report
-grep -r "TODO-DEBT.*Priority: HIGH" app/ tests/
-grep -r "TODO-DEBT.*Priority: MEDIUM" app/ tests/
-grep -r "TODO-DEBT.*Priority: LOW" app/ tests/
+grep -r "TODO-DEBT.*Priority: HIGH" src/ tests/
+grep -r "TODO-DEBT.*Priority: MEDIUM" src/ tests/
+grep -r "TODO-DEBT.*Priority: LOW" src/ tests/
 
 # Target: Resolve 1-2 HIGH priority items per month
 # Target: Address 1 MEDIUM priority item per month when no HIGH items exist
@@ -493,6 +620,8 @@ mcp__zen__codereview   # Comprehensive code quality analysis
 - **mcp__zen__analyze**: General file/code exploration, dependency analysis, pattern detection
 - **mcp__zen__chat**: Brainstorming, second opinions, collaborative thinking, concept explanations
 - **mcp__zen__precommit**: Pre-commit validation, change analysis, safety checks
+- **mcp__context7__resolve-library-id**: Find library documentation IDs for frameworks/packages
+- **mcp__context7__get-library-docs**: Retrieve up-to-date documentation for specific libraries (PyO3, Rust crates, etc.)
 
 **Thinking Mode Guidelines:**
 - **minimal**: Quick checks, simple confirmations
@@ -513,12 +642,87 @@ mcp__zen__codereview   # Comprehensive code quality analysis
 - **Planning Phase**: chat → thinkdeep → analyze (explore → validate → understand)
 - **Implementation**: codereview → debug → precommit (quality → troubleshoot → validate)
 - **Problem Solving**: debug → thinkdeep → chat (investigate → analyze → explore solutions)
+- **Documentation Lookup**: context7__resolve-library-id → context7__get-library-docs (find ID → retrieve docs)
+
+**Multi-Agent Patterns:**
+
+**Concurrent Tool Usage:**
+When gathering information from multiple sources, use tools in parallel:
+- Launch multiple search operations simultaneously (Grep, Glob, Task)
+- Run multiple bash commands in parallel for status checks
+- Query multiple documentation sources concurrently
+
+**When to Use Multiple Agents:**
+- **Information Gathering**: Search for patterns across different file types
+- **Status Checks**: Run git status, git diff, git log simultaneously
+- **Complex Analysis**: Use codereview + debug + analyze for comprehensive understanding
+- **Documentation + Implementation**: Fetch docs while examining code
+
+**Sequential vs Parallel:**
+- **Parallel**: Independent operations (multiple searches, status checks)
+- **Sequential**: Dependent operations (read file → edit file → test changes)
 
 **File Context Strategy:**
 - **Include liberally**: These tools can handle large amounts of context
 - **Related files**: Include all files that might be relevant to the analysis
 - **Diagnostic data**: Include logs, stack traces, error outputs for debugging
 - **Configuration files**: Include settings and config when analyzing system behavior
+
+## Code Review 3 Implementation Status
+
+**Current Phase**: Phase 1 Complete - Rust Implementation Done
+
+**Implementation Progress:**
+1. **Week 1 - Rust Consolidation**: ✅ COMPLETE
+   - Created `run_quote_pipeline()` main orchestration function
+   - Added all modular helper functions (validate_filename, validate_3d_file, etc.)
+   - Implemented OrcaError enum with proper PyErr conversion
+   - Added all required data structures (TelegramConfig, ProfilePaths, FileInfo, etc.)
+   - Updated Cargo.toml with uuid dependency
+   - All new functions registered in Python module
+
+2. **Week 2 - Python Simplification**: 🔄 IN PROGRESS
+   - Next: Update main.py to use simplified endpoint
+   - Next: Update tasks.py to call run_quote_pipeline
+   - Next: Remove entire service layer
+
+3. **Week 3 - Modular Testing**: ⏳ PENDING
+   - One test per function, <10 lines each
+   - Separate Rust tests from Python tests
+
+4. **Week 4 - Configuration & Cleanup**: ⏳ PENDING
+   - Simplify settings, update documentation
+
+**Phase 1 Completion Details:**
+- **OrcaError**: Custom error enum with specific error types for each failure mode
+- **Data Structures**: TelegramConfig, ProfilePaths, FileInfo, SlicingMetadata, QuoteBreakdown, QuoteResult
+- **Modular Functions**: 
+  - `validate_filename()`: Secure filename sanitization
+  - `validate_3d_file()`: In-memory content validation
+  - `discover_available_materials()`: Profile directory scanning
+  - `resolve_profile_paths()`: Material to profile mapping
+  - `execute_slicer()`: OrcaSlicer CLI execution
+  - `parse_gcode_metadata()`: G-code parsing
+  - `calculate_final_quote()`: Pricing calculation
+- **Main Pipeline**: `run_quote_pipeline()` orchestrates entire workflow
+
+**Build Requirements:**
+- Rust/Cargo must be installed (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Build with: `source ~/.cargo/env && uv run maturin develop`
+
+**Success Metrics:**
+- **Code Reduction**: ~40% fewer lines of code
+- **Test Simplicity**: Average test is <10 lines
+- **Performance**: 3x faster file validation
+- **Modularity**: No function >50 lines
+- **Clarity**: New developer can understand in <1 hour
+
+**Key Changes from Current Architecture:**
+- Service layer (`services/`) will be completely removed
+- All business logic moves to Rust `run_quote_pipeline()` function
+- Python reduced to HTTP handling and Celery task dispatch only
+- Each Rust function does exactly ONE thing
+- Celery retained for handling unpredictable OrcaSlicer execution times
 
 ## Claude Behavior Guidelines
 
