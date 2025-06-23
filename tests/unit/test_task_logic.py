@@ -9,13 +9,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.tasks import cleanup_old_files, process_quote_request
+from orca_quote_machine.tasks import cleanup_old_files, process_quote_request
 
 
 class TestProcessQuoteRequestLogic:
     """Test the quote processing task logic."""
 
-    @patch('app.tasks.validate_3d_model')
+    @patch('orca_quote_machine.tasks.validate_3d_model')
     def test_task_validates_file_first(self, mock_validate):
         """Test that task validates file before processing."""
         # Setup invalid file validation
@@ -37,7 +37,7 @@ class TestProcessQuoteRequestLogic:
             assert "Invalid 3D model" in result["error"]
             mock_validate.assert_called_once_with(temp_file.name)
 
-    @patch('app.tasks.validate_3d_model')
+    @patch('orca_quote_machine.tasks.validate_3d_model')
     def test_task_handles_unknown_material(self, mock_validate):
         """Test that unknown materials default to PLA."""
         mock_result = MagicMock()
@@ -48,7 +48,7 @@ class TestProcessQuoteRequestLogic:
         mock_validate.return_value = mock_result
 
         # Mock the async pipeline
-        with patch('app.tasks.asyncio.run') as mock_run:
+        with patch('orca_quote_machine.tasks.asyncio.run') as mock_run:
             mock_run.return_value = {
                 "success": True,
                 "quote_id": "test-id",
@@ -74,7 +74,7 @@ class TestProcessQuoteRequestLogic:
         # Ensure file exists
         assert os.path.exists(temp_path)
 
-        with patch('app.tasks.validate_3d_model') as mock_validate:
+        with patch('orca_quote_machine.tasks.validate_3d_model') as mock_validate:
             mock_result = MagicMock()
             mock_result.file_type = "stl"
             mock_result.file_size = 100
@@ -82,7 +82,7 @@ class TestProcessQuoteRequestLogic:
             mock_result.error_message = None
             mock_validate.return_value = mock_result
 
-            with patch('app.tasks.asyncio.run') as mock_run:
+            with patch('orca_quote_machine.tasks.asyncio.run') as mock_run:
                 mock_run.return_value = {
                     "success": True,
                     "quote_id": "test-id",
@@ -107,7 +107,7 @@ class TestProcessQuoteRequestLogic:
         # Ensure file exists
         assert os.path.exists(temp_path)
 
-        with patch('app.tasks.validate_3d_model') as mock_validate:
+        with patch('orca_quote_machine.tasks.validate_3d_model') as mock_validate:
             mock_validate.side_effect = Exception("Validation error")
 
             result = process_quote_request(
@@ -120,8 +120,8 @@ class TestProcessQuoteRequestLogic:
             # File should still be cleaned up
             assert not os.path.exists(temp_path)
 
-    @patch('app.tasks.send_failure_notification')
-    @patch('app.tasks.validate_3d_model')
+    @patch('orca_quote_machine.tasks.send_failure_notification')
+    @patch('orca_quote_machine.tasks.validate_3d_model')
     def test_task_sends_error_notification(self, mock_validate, mock_notify):
         """Test that errors trigger admin notification."""
         mock_validate.side_effect = Exception("Critical error")
@@ -143,20 +143,20 @@ class TestRunProcessingPipelineLogic:
     @pytest.mark.asyncio
     async def test_pipeline_orchestrates_services(self, sample_slicing_result, sample_cost_breakdown):
         """Test that pipeline calls services in correct order."""
-        from app.tasks import run_processing_pipeline
+        from orca_quote_machine.tasks import run_processing_pipeline
 
         # Mock all services but use real Rust objects for return values
-        with patch('app.tasks.OrcaSlicerService') as mock_slicer:
+        with patch('orca_quote_machine.tasks.OrcaSlicerService') as mock_slicer:
             mock_slicer_instance = mock_slicer.return_value
             # Return the real SlicingResult fixture
             mock_slicer_instance.slice_model = AsyncMock(return_value=sample_slicing_result)
 
-            with patch('app.tasks.PricingService') as mock_pricing:
+            with patch('orca_quote_machine.tasks.PricingService') as mock_pricing:
                 mock_pricing_instance = mock_pricing.return_value
                 # Return the real CostBreakdown fixture
                 mock_pricing_instance.calculate_quote = MagicMock(return_value=sample_cost_breakdown)
 
-                with patch('app.tasks.TelegramService') as mock_telegram:
+                with patch('orca_quote_machine.tasks.TelegramService') as mock_telegram:
                     mock_telegram_instance = mock_telegram.return_value
                     mock_telegram_instance.send_quote_notification = AsyncMock(return_value=True)
 
@@ -180,7 +180,7 @@ class TestRunProcessingPipelineLogic:
 class TestCleanupTaskLogic:
     """Test the file cleanup task logic."""
 
-    @patch('app.tasks.cleanup_old_files_rust')
+    @patch('orca_quote_machine.tasks.cleanup_old_files_rust')
     def test_cleanup_returns_success_stats(self, mock_cleanup, sample_cleanup_stats):
         """Test cleanup task formats Rust stats correctly."""
         # Use real CleanupStats object
@@ -192,7 +192,7 @@ class TestCleanupTaskLogic:
         assert result["files_cleaned"] == sample_cleanup_stats.files_cleaned
         assert result["bytes_freed"] == sample_cleanup_stats.bytes_freed
 
-    @patch('app.tasks.cleanup_old_files_rust')
+    @patch('orca_quote_machine.tasks.cleanup_old_files_rust')
     def test_cleanup_handles_rust_errors(self, mock_cleanup):
         """Test cleanup task handles Rust function errors."""
         mock_cleanup.side_effect = Exception("Rust error")

@@ -6,10 +6,9 @@ import tempfile
 from pathlib import Path
 
 # Import enhanced Rust functions
-from _rust_core import SlicingResult, parse_slicer_output
-
-from app.core.config import Settings, get_settings
-from app.models.quote import MaterialType
+from orca_quote_machine._rust_core import SlicingResult, parse_slicer_output
+from orca_quote_machine.core.config import Settings, get_settings
+from orca_quote_machine.models.quote import MaterialType
 
 
 class SlicerError(Exception):
@@ -123,7 +122,7 @@ class OrcaSlicerService:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "output"
-            output_dir.mkdir()
+            output_dir.mkdir(exist_ok=True)
 
             # Build command
             command = [

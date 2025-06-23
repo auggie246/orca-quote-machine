@@ -1,14 +1,13 @@
 """FastAPI dependency injection providers."""
 
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
 
-from app.core.config import Settings, get_settings
-from app.services.pricing import PricingService
-from app.services.slicer import OrcaSlicerService
-from app.services.telegram import TelegramService
+from orca_quote_machine.core.config import Settings, get_settings
+from orca_quote_machine.services.pricing import PricingService
+from orca_quote_machine.services.slicer import OrcaSlicerService
+from orca_quote_machine.services.telegram import TelegramService
 
 
 def get_slicer_service(

@@ -18,7 +18,7 @@ fi
 
 echo "Starting Celery worker..."
 
-uv run celery -A app.tasks worker \
+uv run celery -A orca_quote_machine.tasks worker \
     --loglevel=info \
     --concurrency=2 \
     --hostname=worker@%h

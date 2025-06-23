@@ -7,16 +7,16 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-# Import Rust functions
-from _rust_core import cleanup_old_files_rust, validate_3d_model
 from celery import Celery, Task
 from celery.utils.log import get_task_logger
 
-from app.core.config import get_settings
-from app.models.quote import MaterialType, TelegramMessage
-from app.services.pricing import PricingService
-from app.services.slicer import OrcaSlicerService
-from app.services.telegram import TelegramService
+# Import Rust functions
+from orca_quote_machine._rust_core import cleanup_old_files_rust, validate_3d_model
+from orca_quote_machine.core.config import get_settings
+from orca_quote_machine.models.quote import MaterialType, TelegramMessage
+from orca_quote_machine.services.pricing import PricingService
+from orca_quote_machine.services.slicer import OrcaSlicerService
+from orca_quote_machine.services.telegram import TelegramService
 
 settings = get_settings()
 logger = get_task_logger(__name__)

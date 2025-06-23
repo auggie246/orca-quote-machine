@@ -16,6 +16,6 @@ echo "Running ruff formatting..."
 uv run ruff format .
 
 echo "Running mypy type checks..."
-uv run mypy app/ --ignore-missing-imports
+uv run mypy src/orca_quote_machine/ --ignore-missing-imports
 
 echo "Code formatting complete!"

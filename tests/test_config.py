@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings, SlicerProfileSettings, get_settings
+from orca_quote_machine.core.config import Settings, SlicerProfileSettings, get_settings
 
 
 class TestCustomValidationLogic:

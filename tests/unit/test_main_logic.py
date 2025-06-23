@@ -6,10 +6,10 @@ Focus: Test request validation logic, file handling logic, and response formatti
 from unittest.mock import MagicMock, patch
 
 import pytest
-from _rust_core import secure_filename
 from fastapi.testclient import TestClient
 
-from app.main import app
+from orca_quote_machine._rust_core import secure_filename
+from orca_quote_machine.main import app
 
 
 class TestSecureFilenameIntegration:
@@ -68,7 +68,7 @@ class TestQuoteEndpointLogic:
         }
 
         # Mock slicer service to control available materials
-        with patch('app.main.OrcaSlicerService') as mock_slicer:
+        with patch('orca_quote_machine.main.OrcaSlicerService') as mock_slicer:
             mock_instance = mock_slicer.return_value
             mock_instance.get_available_materials.return_value = ["PLA", "PETG", "ASA"]
 
@@ -87,17 +87,18 @@ class TestQuoteEndpointLogic:
             "color": "Black"
         }
 
-        # Mock the services
-        with patch('app.main.OrcaSlicerService') as mock_slicer:
-            mock_instance = mock_slicer.return_value
-            mock_instance.get_available_materials.return_value = ["PLA", "PETG", "ASA", "TPU"]
+        # Mock the slicer service method directly
+        with patch('orca_quote_machine.services.slicer.OrcaSlicerService.get_available_materials') as mock_materials:
+            mock_materials.return_value = ["PLA", "PETG", "ASA", "TPU"]
 
             # Mock the task
-            with patch('app.main.process_quote_request.delay') as mock_task:
+            with patch('orca_quote_machine.main.process_quote_request.delay') as mock_task:
                 mock_task.return_value = MagicMock(id="test-task-id")
 
                 response = client.post("/quote", files=files, data=data)
 
+                if response.status_code != 202:
+                    print(f"Response: {response.status_code} - {response.text}")
                 assert response.status_code == 202
                 assert response.json()["material"] == "TPU"
 
@@ -113,7 +114,7 @@ class TestQuoteEndpointLogic:
             "color": "Red"
         }
 
-        with patch('app.main.process_quote_request.delay') as mock_task:
+        with patch('orca_quote_machine.main.process_quote_request.delay') as mock_task:
             mock_task.return_value = MagicMock(id="test-task-id")
 
             response = client.post("/quote", files=files, data=data)
@@ -134,7 +135,7 @@ class TestHomeEndpointLogic:
 
     def test_home_includes_available_materials(self, client):
         """Test that home page gets materials from slicer service."""
-        with patch('app.main.OrcaSlicerService') as mock_slicer:
+        with patch('orca_quote_machine.main.OrcaSlicerService') as mock_slicer:
             mock_instance = mock_slicer.return_value
             mock_instance.get_available_materials.return_value = ["PLA", "PETG", "TPU"]
 
@@ -145,7 +146,7 @@ class TestHomeEndpointLogic:
 
     def test_home_fallback_on_slicer_error(self, client):
         """Test that home page falls back to enum values on error."""
-        with patch('app.main.OrcaSlicerService') as mock_slicer:
+        with patch('orca_quote_machine.main.OrcaSlicerService') as mock_slicer:
             mock_instance = mock_slicer.return_value
             mock_instance.get_available_materials.side_effect = Exception("Service error")
 
@@ -165,7 +166,7 @@ class TestTaskStatusLogic:
 
     def test_status_formats_pending_correctly(self, client):
         """Test pending task status formatting."""
-        with patch('app.main.celery_app.AsyncResult') as mock_result:
+        with patch('orca_quote_machine.main.celery_app.AsyncResult') as mock_result:
             mock_result.return_value.state = "PENDING"
 
             response = client.get("/status/test-task-id")
@@ -176,7 +177,7 @@ class TestTaskStatusLogic:
 
     def test_status_includes_result_on_success(self, client):
         """Test successful task includes result data."""
-        with patch('app.main.celery_app.AsyncResult') as mock_result:
+        with patch('orca_quote_machine.main.celery_app.AsyncResult') as mock_result:
             mock_async = mock_result.return_value
             mock_async.state = "SUCCESS"
             mock_async.result = {"total_cost": 25.50, "print_time": 120}

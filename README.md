@@ -20,13 +20,16 @@ A high-performance web application for generating 3D printing quotations using O
 - **OrcaSlicer CLI**: Professional 3D model slicing and G-code generation
 - **Telegram Bot**: Real-time admin notifications
 
-### Recent Improvements (December 2024)
+### Recent Improvements (June 2025)
 
+- **Project Structure**: Adopted Python's "src layout" for better packaging (app/ → src/orca_quote_machine/)
 - **Non-blocking I/O**: Replaced blocking file operations with async alternatives
 - **Dependency Injection**: Implemented FastAPI dependency injection for services
 - **Enhanced Error Handling**: More specific exception handling for better debugging
 - **Test Improvements**: Updated fixtures to use real Rust objects instead of mocks
 - **Memory Management**: Better cleanup of temporary files and directories in tests
+- **Rust Integration**: Consolidated duplicate functions, added secure_filename using sanitize-filename crate
+- **Performance**: Optimized regex compilation with once_cell for frequently used patterns
 
 ### Documentation
 

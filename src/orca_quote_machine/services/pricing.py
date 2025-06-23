@@ -1,9 +1,12 @@
 """Pricing calculation service."""
 
-from _rust_core import CostBreakdown, SlicingResult, calculate_quote_rust
-
-from app.core.config import Settings, get_settings
-from app.models.quote import MaterialType
+from orca_quote_machine._rust_core import (
+    CostBreakdown,
+    SlicingResult,
+    calculate_quote_rust,
+)
+from orca_quote_machine.core.config import Settings, get_settings
+from orca_quote_machine.models.quote import MaterialType
 
 
 class PricingService:

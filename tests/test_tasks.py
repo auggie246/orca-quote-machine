@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.quote import MaterialType
-from app.tasks import (
+from orca_quote_machine.models.quote import MaterialType
+from orca_quote_machine.tasks import (
     cleanup_old_files,
     process_quote_request,
     run_processing_pipeline,
@@ -16,9 +16,9 @@ from app.tasks import (
 class TestTasks:
     """Tests for Celery task functions."""
 
-    @patch("app.tasks.asyncio.run")
-    @patch("app.tasks.validate_3d_model", None)
-    @patch("app.tasks.os.path.exists", return_value=False)
+    @patch("orca_quote_machine.tasks.asyncio.run")
+    @patch("orca_quote_machine.tasks.validate_3d_model", None)
+    @patch("orca_quote_machine.tasks.os.path.exists", return_value=False)
     def test_process_quote_request(
         self, mock_exists: MagicMock, mock_asyncio_run: MagicMock
     ) -> None:
@@ -37,9 +37,9 @@ class TestTasks:
         assert "success" in result
 
     @pytest.mark.asyncio
-    @patch("app.tasks.OrcaSlicerService")
-    @patch("app.tasks.PricingService")
-    @patch("app.tasks.TelegramService")
+    @patch("orca_quote_machine.tasks.OrcaSlicerService")
+    @patch("orca_quote_machine.tasks.PricingService")
+    @patch("orca_quote_machine.tasks.TelegramService")
     async def test_run_processing_pipeline(
         self, mock_telegram: MagicMock, mock_pricing: MagicMock, mock_slicer: MagicMock
     ) -> None:
@@ -47,7 +47,7 @@ class TestTasks:
         import os
         import tempfile
 
-        from _rust_core import SlicingResult, parse_slicer_output
+        from orca_quote_machine._rust_core import SlicingResult, parse_slicer_output
 
         # Create a real SlicingResult using Rust parser
         async def create_real_slicing_result() -> SlicingResult:
@@ -64,7 +64,7 @@ class TestTasks:
         mock_slicer_instance.slice_model = AsyncMock(return_value=real_slicing_result)
 
         # Use real pricing service to create real CostBreakdown
-        from app.services.pricing import PricingService
+        from orca_quote_machine.services.pricing import PricingService
         real_pricing_service = PricingService()
         real_cost_breakdown = real_pricing_service.calculate_quote(real_slicing_result, MaterialType.PLA)
 
@@ -88,7 +88,7 @@ class TestTasks:
         assert "success" in result
 
     @pytest.mark.asyncio
-    @patch("app.tasks.TelegramService")
+    @patch("orca_quote_machine.tasks.TelegramService")
     async def test_send_failure_notification(self, mock_telegram: MagicMock) -> None:
         """Test send_failure_notification function."""
         mock_telegram_instance = mock_telegram.return_value
@@ -99,7 +99,7 @@ class TestTasks:
         # Function returns None
         assert result is None
 
-    @patch("app.tasks.cleanup_old_files_rust")
+    @patch("orca_quote_machine.tasks.cleanup_old_files_rust")
     def test_cleanup_old_files(self, mock_cleanup_rust: MagicMock) -> None:
         """Test cleanup_old_files function."""
         # Mock the Rust cleanup function to return stats

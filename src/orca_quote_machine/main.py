@@ -8,7 +8,6 @@ from typing import Annotated, Any
 
 import aiofiles
 import aiofiles.os
-from _rust_core import secure_filename
 from fastapi import (
     Depends,
     FastAPI,
@@ -24,11 +23,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
 
-from app.core.config import get_settings
-from app.dependencies import get_slicer_service
-from app.models.quote import MaterialType, QuoteRequest
-from app.services.slicer import OrcaSlicerService
-from app.tasks import celery_app, process_quote_request
+from orca_quote_machine._rust_core import secure_filename
+from orca_quote_machine.core.config import get_settings
+from orca_quote_machine.dependencies import get_slicer_service
+from orca_quote_machine.models.quote import MaterialType, QuoteRequest
+from orca_quote_machine.services.slicer import OrcaSlicerService
+from orca_quote_machine.tasks import celery_app, process_quote_request
 
 settings = get_settings()
 
@@ -265,5 +265,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "app.main:app", host=settings.host, port=settings.port, reload=settings.debug
+        "orca_quote_machine.main:app", host=settings.host, port=settings.port, reload=settings.debug
     )

@@ -4,8 +4,8 @@ import httpx
 from telegram import Bot
 from telegram.error import TelegramError
 
-from app.core.config import Settings, get_settings
-from app.models.quote import TelegramMessage
+from orca_quote_machine.core.config import Settings, get_settings
+from orca_quote_machine.models.quote import TelegramMessage
 
 
 class TelegramService:

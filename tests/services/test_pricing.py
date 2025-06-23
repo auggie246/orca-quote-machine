@@ -4,10 +4,13 @@ import asyncio
 import os
 import tempfile
 
-from _rust_core import CostBreakdown, SlicingResult, parse_slicer_output
-
-from app.models.quote import MaterialType
-from app.services.pricing import PricingService
+from orca_quote_machine._rust_core import (
+    CostBreakdown,
+    SlicingResult,
+    parse_slicer_output,
+)
+from orca_quote_machine.models.quote import MaterialType
+from orca_quote_machine.services.pricing import PricingService
 
 
 class TestPricingService:

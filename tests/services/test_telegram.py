@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.models.quote import TelegramMessage
-from app.services.telegram import TelegramService
+from orca_quote_machine.models.quote import TelegramMessage
+from orca_quote_machine.services.telegram import TelegramService
 
 
 class TestTelegramService:

@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.models.quote import MaterialType
-from app.services.slicer import OrcaSlicerService, SlicerError
+from orca_quote_machine.models.quote import MaterialType
+from orca_quote_machine.services.slicer import OrcaSlicerService, SlicerError
 
 
 class TestSlicerServiceLogic:

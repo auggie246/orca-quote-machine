@@ -17,8 +17,8 @@ os.environ["PYTEST_CURRENT_TEST"] = "conftest.py"
 os.environ["MAX_FILE_SIZE"] = "104857600"
 os.environ["SECRET_KEY"] = "test-secret-key-for-pytest"
 
-from app.core.config import get_settings
-from app.main import app
+from orca_quote_machine.core.config import get_settings
+from orca_quote_machine.main import app
 
 
 @pytest.fixture(scope="session")
@@ -70,15 +70,17 @@ def mock_orcaslicer_cli(mocker: MockerFixture) -> MagicMock:
 
 
 @pytest.fixture
-async def sample_slicing_result(create_test_gcode_dir):
+def sample_slicing_result(create_test_gcode_dir):
     """Create a real SlicingResult for testing."""
-    from _rust_core import parse_slicer_output
+    import asyncio
+
+    from orca_quote_machine._rust_core import parse_slicer_output
 
     # Create a test G-code directory with expected content
     temp_dir = create_test_gcode_dir(print_time="2h 0m", filament="50.0g")
 
     # Use the real Rust parser to create a SlicingResult
-    slicing_result = await parse_slicer_output(temp_dir)
+    slicing_result = asyncio.run(parse_slicer_output(temp_dir))
 
     # Clean up the temporary directory
     import shutil
@@ -90,7 +92,7 @@ async def sample_slicing_result(create_test_gcode_dir):
 @pytest.fixture
 def sample_cost_breakdown():
     """Create a real CostBreakdown for testing."""
-    from _rust_core import calculate_quote_rust
+    from orca_quote_machine._rust_core import calculate_quote_rust
 
     # Use real Rust function with test parameters
     # calculate_quote_rust(print_time_minutes, filament_weight_grams, material_type,
@@ -101,7 +103,7 @@ def sample_cost_breakdown():
 @pytest.fixture
 def sample_model_info(temp_upload_file):
     """Create a real ModelInfo for testing."""
-    from _rust_core import validate_3d_model
+    from orca_quote_machine._rust_core import validate_3d_model
 
     # Use the real Rust validator with a temporary test file
     return validate_3d_model(temp_upload_file)
@@ -110,7 +112,7 @@ def sample_model_info(temp_upload_file):
 @pytest.fixture
 def sample_cleanup_stats():
     """Create a real CleanupStats for testing."""
-    from _rust_core import cleanup_old_files_rust
+    from orca_quote_machine._rust_core import cleanup_old_files_rust
 
     # Create a temporary directory with old files
     temp_dir = tempfile.mkdtemp()

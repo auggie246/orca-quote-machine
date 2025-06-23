@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from app.models.quote import (
+from orca_quote_machine.models.quote import (
     MaterialType,
     QuoteRequest,
     QuoteResponse,

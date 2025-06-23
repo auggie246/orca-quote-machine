@@ -55,11 +55,12 @@ dev = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "orca_quote_machine._rust_core"
+python-source = "src"
 
 [tool.ruff]
 # Define the source directories for Ruff to scan.
 # Based on your structure, we'll target the Python application code and tests.
-src = ["app", "tests"]
+src = ["src", "tests"]
 
 # Exclude common directories, build artifacts, and the Rust source directory.
 # This prevents Ruff from trying to parse files it shouldn't.
@@ -84,7 +85,6 @@ exclude = [
     "node_modules",
     "venv",
     "target", # Exclude Rust build artifacts
-    "src",    # Exclude the Rust source code directory
 ]
 
 # Target the lowest Python version you support (from your CI matrix).
@@ -118,7 +118,7 @@ suppress-none-returning = true
 [tool.ruff.lint.isort]
 # Define your project's own modules as "first-party".
 # This ensures `from app import ...` is sorted correctly.
-known-first-party = ["app"]
+known-first-party = ["orca_quote_machine"]
 
 
 [tool.ruff.format]
