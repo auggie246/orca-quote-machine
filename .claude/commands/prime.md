@@ -8,3 +8,4 @@ READ:
     ai_docs/*
     src/*
     app/*
+    pyproject.toml
