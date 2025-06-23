@@ -2,19 +2,30 @@
 
 import contextlib
 import os
-import re
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import aiofiles
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
+import aiofiles.os
+from _rust_core import secure_filename
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
 
 from app.core.config import get_settings
+from app.dependencies import get_slicer_service
 from app.models.quote import MaterialType, QuoteRequest
 from app.services.slicer import OrcaSlicerService
 from app.tasks import celery_app, process_quote_request
@@ -39,30 +50,15 @@ templates = Jinja2Templates(directory="templates")
 Path(settings.upload_dir).mkdir(exist_ok=True)
 
 
-def secure_filename(filename: str) -> str:
-    """Sanitizes a filename to prevent path traversal attacks."""
-    if not filename:
-        return ""
-
-    # Keep only alphanumeric, dots, dashes, and underscores
-    filename = re.sub(r"[^a-zA-Z0-9._-]", "", filename)
-
-    # Prevent path traversal by removing leading dots or slashes
-    filename = filename.lstrip("./\\")
-
-    # Ensure we don't have an empty filename
-    if not filename:
-        return "unnamed_file"
-
-    return filename
-
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request) -> Response:
+async def home(
+    request: Request,
+    slicer_service: Annotated[OrcaSlicerService, Depends(get_slicer_service)]
+) -> Response:
     """Home page with quote request form."""
     # Get available materials from slicer service (includes custom materials)
     try:
-        slicer_service = OrcaSlicerService()
         available_materials = slicer_service.get_available_materials()
     except Exception:
         # Fallback to enum values if slicer service fails
@@ -81,6 +77,7 @@ async def home(request: Request) -> Response:
 
 @app.post("/quote")
 async def create_quote(
+    slicer_service: Annotated[OrcaSlicerService, Depends(get_slicer_service)],
     name: str = Form(..., min_length=1, max_length=100),
     mobile: str = Form(..., min_length=8, max_length=20),
     material: str | None = Form(None),
@@ -110,7 +107,6 @@ async def create_quote(
     # Validate material against available materials (including custom ones)
     if material:
         try:
-            slicer_service = OrcaSlicerService()
             available_materials = slicer_service.get_available_materials()
             if material.upper() not in available_materials:
                 raise HTTPException(
@@ -159,7 +155,7 @@ async def create_quote(
                     # Clean up partial file
                     await f.close()
                     if file_path.exists():
-                        os.remove(file_path)
+                        await aiofiles.os.remove(file_path)
                     raise HTTPException(
                         status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                         detail=f"File too large. Maximum size: {settings.max_file_size // (1024 * 1024)}MB",
@@ -167,14 +163,32 @@ async def create_quote(
                 await f.write(chunk)
     except HTTPException:
         raise  # Re-raise HTTP exceptions
-    except Exception as e:
+    except OSError as e:
         # Clean up file if it exists
         if file_path.exists():
-            with contextlib.suppress(Exception):
-                os.remove(file_path)
+            with contextlib.suppress(OSError):
+                await aiofiles.os.remove(file_path)
+
+        # Provide specific error messages for common I/O errors
+        if e.errno == 28:  # ENOSPC - No space left on device
+            detail = "No disk space available to save the file"
+        elif e.errno == 13:  # EACCES - Permission denied
+            detail = "Permission denied when saving the file"
+        else:
+            detail = f"Failed to save file: {str(e)}"
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save file: {str(e)}",
+            detail=detail,
+        ) from e
+    except Exception as e:
+        # Handle any other unexpected errors
+        if file_path.exists():
+            with contextlib.suppress(OSError):
+                await aiofiles.os.remove(file_path)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error while saving file: {type(e).__name__}",
         ) from e
 
     # Start background processing
@@ -197,14 +211,23 @@ async def create_quote(
             },
         )
 
+    except (ConnectionError, TimeoutError) as e:
+        # Cleanup file if task creation fails due to connection issues
+        with contextlib.suppress(OSError):
+            await aiofiles.os.remove(file_path)
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Background processing service is temporarily unavailable. Please try again later.",
+        ) from e
     except Exception as e:
-        # Cleanup file if task creation fails
-        with contextlib.suppress(Exception):
-            os.remove(file_path)
+        # Cleanup file if task creation fails for other reasons
+        with contextlib.suppress(OSError):
+            await aiofiles.os.remove(file_path)
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start processing: {str(e)}",
+            detail=f"Failed to start processing: {type(e).__name__}",
         ) from e
 
 

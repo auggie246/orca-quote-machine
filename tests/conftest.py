@@ -48,56 +48,126 @@ def test_settings() -> Any:
     settings.upload_dir = temp_dir
     settings.max_file_size = 10 * 1024 * 1024  # 10MB for tests
     settings.secret_key = "test-secret-key"
-    return settings
+
+    yield settings
+
+    # Cleanup the temporary directory
+    import shutil
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
-def mock_orcaslicer_service(mocker: MockerFixture) -> MagicMock:
-    """Mock the OrcaSlicerService to prevent actual CLI calls."""
-    mock_service = mocker.patch("app.services.slicer.OrcaSlicerService")
-    mock_instance = mock_service.return_value
-
-    # Default successful return value
-    mock_instance.slice_model.return_value = {
-        "print_time_minutes": 120,  # 2 hours
-        "filament_weight_grams": 25.5,
-        "layer_count": 200,
-    }
-    return mock_instance
+def mock_orcaslicer_cli(mocker: MockerFixture) -> MagicMock:
+    """Mock only the OrcaSlicer CLI subprocess call."""
+    # Mock at the subprocess level, not the service level
+    mock_subprocess = mocker.patch("asyncio.create_subprocess_exec")
+    mock_process = mocker.AsyncMock()
+    mock_process.returncode = 0
+    mock_process.communicate = mocker.AsyncMock(return_value=(b"Success", b""))
+    mock_subprocess.return_value = mock_process
+    return mock_subprocess
 
 
 @pytest.fixture
-def mock_pricing_service(mocker: MockerFixture) -> MagicMock:
-    """Mock the PricingService."""
-    mock_service = mocker.patch("app.services.pricing.PricingService")
-    mock_instance = mock_service.return_value
+async def sample_slicing_result(create_test_gcode_dir):
+    """Create a real SlicingResult for testing."""
+    from _rust_core import parse_slicer_output
 
-    # Default pricing calculation
-    mock_instance.calculate_quote.return_value = {
-        "material_cost": 12.50,
-        "time_cost": 15.00,
-        "total_cost": 30.25,
-    }
-    return mock_instance
+    # Create a test G-code directory with expected content
+    temp_dir = create_test_gcode_dir(print_time="2h 0m", filament="50.0g")
 
+    # Use the real Rust parser to create a SlicingResult
+    slicing_result = await parse_slicer_output(temp_dir)
 
-@pytest.fixture
-def mock_telegram_service(mocker: MockerFixture) -> MagicMock:
-    """Mock the TelegramService."""
-    mock_service = mocker.patch("app.services.telegram.TelegramService")
-    mock_instance = mock_service.return_value
+    # Clean up the temporary directory
+    import shutil
+    shutil.rmtree(temp_dir)
 
-    # Mock successful message sending
-    mock_instance.send_quote_notification.return_value = True
-    return mock_instance
+    return slicing_result
 
 
 @pytest.fixture
-def mock_rust_validation(mocker: MockerFixture) -> MagicMock:
-    """Mock the Rust validation functions."""
-    mock_validate = mocker.patch("app.tasks.validate_3d_model")
-    mock_validate.return_value = True  # Valid file by default
-    return mock_validate
+def sample_cost_breakdown():
+    """Create a real CostBreakdown for testing."""
+    from _rust_core import calculate_quote_rust
+
+    # Use real Rust function with test parameters
+    # calculate_quote_rust(print_time_minutes, filament_weight_grams, material_type,
+    #                      price_per_kg, additional_time_hours, price_multiplier, minimum_price)
+    return calculate_quote_rust(120, 50.0, "PLA", 25.0, 0.5, 1.1, 5.0)
+
+
+@pytest.fixture
+def sample_model_info(temp_upload_file):
+    """Create a real ModelInfo for testing."""
+    from _rust_core import validate_3d_model
+
+    # Use the real Rust validator with a temporary test file
+    return validate_3d_model(temp_upload_file)
+
+
+@pytest.fixture
+def sample_cleanup_stats():
+    """Create a real CleanupStats for testing."""
+    from _rust_core import cleanup_old_files_rust
+
+    # Create a temporary directory with old files
+    temp_dir = tempfile.mkdtemp()
+
+    # Create some test files
+    for i in range(3):
+        test_file = os.path.join(temp_dir, f"old_file_{i}.stl")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        # Make files old by setting their modification time to 48 hours ago
+        old_time = os.path.getmtime(test_file) - (48 * 3600)
+        os.utime(test_file, (old_time, old_time))
+
+    # Run cleanup on the directory
+    stats = cleanup_old_files_rust(temp_dir, 24)
+
+    # Clean up the directory
+    import shutil
+    shutil.rmtree(temp_dir)
+
+    return stats
+
+
+@pytest.fixture
+def mock_telegram_api(mocker: MockerFixture) -> MagicMock:
+    """Mock only the Telegram HTTP API calls."""
+    # Mock at the HTTP level, not the service level
+    mock_post = mocker.patch("httpx.AsyncClient.post")
+    mock_response = mocker.AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json = mocker.AsyncMock(return_value={"ok": True})
+    mock_post.return_value = mock_response
+    return mock_post
+
+
+@pytest.fixture
+def create_test_gcode_dir():
+    """Create a temporary directory with test G-code file."""
+    created_dirs = []
+
+    def _create_gcode(print_time="2h 0m", filament="100.0g"):
+        temp_dir = tempfile.mkdtemp()
+        created_dirs.append(temp_dir)
+        gcode_file = os.path.join(temp_dir, 'output.gcode')
+        with open(gcode_file, 'w') as f:
+            f.write(f'; estimated printing time: {print_time}\n')
+            f.write(f'; filament used: {filament}\n')
+            f.write('; layer_count: 150\n')
+        return temp_dir
+
+    yield _create_gcode
+
+    # Cleanup all created directories
+    import shutil
+    for temp_dir in created_dirs:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
@@ -148,8 +218,20 @@ def temp_upload_file(sample_stl_content: bytes) -> Generator[str, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def cleanup_uploads():
+def cleanup_uploads(test_settings):
     """Automatically cleanup upload directory after each test."""
     yield
-    # Cleanup logic can be added here if needed
-    pass
+
+    # Clean up any files left in the upload directory
+    import shutil
+    upload_dir = test_settings.upload_dir
+    if os.path.exists(upload_dir):
+        for filename in os.listdir(upload_dir):
+            file_path = os.path.join(upload_dir, filename)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception:
+                pass  # Ignore errors during cleanup

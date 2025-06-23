@@ -8,7 +8,7 @@ from pathlib import Path
 # Import enhanced Rust functions
 from _rust_core import SlicingResult, parse_slicer_output
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.models.quote import MaterialType
 
 
@@ -21,8 +21,8 @@ class SlicerError(Exception):
 class OrcaSlicerService:
     """Service for interacting with OrcaSlicer CLI."""
 
-    def __init__(self) -> None:
-        self.settings = get_settings()
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
         self.cli_path = self.settings.orcaslicer_cli_path
         self.profiles_dir = self.settings.slicer_profiles.base_dir  # type: ignore[union-attr]
         self.filament_profiles_dir = self.profiles_dir / "filament"

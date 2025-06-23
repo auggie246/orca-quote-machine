@@ -123,7 +123,7 @@ def process_quote_request(
             if os.path.exists(file_path):
                 os.remove(file_path)
                 logger.info(f"Cleaned up file: {file_path}")
-        except Exception as e:
+        except OSError as e:
             logger.warning(f"Failed to cleanup file {file_path}: {e}")
 
 
@@ -137,20 +137,23 @@ async def run_processing_pipeline(
     """
     Helper async function to orchestrate async calls in the processing pipeline.
     """
+    # Get fresh settings for services
+    settings = get_settings()
+
     # Run slicing
-    slicer_service = OrcaSlicerService()
+    slicer_service = OrcaSlicerService(settings=settings)
     slicing_result = await slicer_service.slice_model(file_path, material_enum)
     logger.info(
         f"Slicing completed: {slicing_result.print_time_minutes}min, {slicing_result.filament_weight_grams}g"
     )
 
     # Calculate pricing
-    pricing_service = PricingService()
+    pricing_service = PricingService(settings=settings)
     cost_breakdown = pricing_service.calculate_quote(slicing_result, material_enum)
     logger.info(f"Pricing calculated: S${cost_breakdown.total_cost:.2f}")
 
     # Send Telegram notification
-    telegram_service = TelegramService()
+    telegram_service = TelegramService(settings=settings)
     telegram_message = TelegramMessage(
         quote_id=short_quote_id,
         customer_name=quote_data["name"],
@@ -186,7 +189,8 @@ async def run_processing_pipeline(
 
 async def send_failure_notification(error_msg: str, quote_id: str) -> None:
     """Send error notification to admin."""
-    telegram_service = TelegramService()
+    settings = get_settings()
+    telegram_service = TelegramService(settings=settings)
     await telegram_service.send_error_notification(error_msg, quote_id)
 
 

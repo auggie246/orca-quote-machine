@@ -1,17 +1,18 @@
 """Telegram bot service for admin notifications."""
 
+import httpx
 from telegram import Bot
 from telegram.error import TelegramError
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.models.quote import TelegramMessage
 
 
 class TelegramService:
     """Service for sending notifications via Telegram bot."""
 
-    def __init__(self) -> None:
-        self.settings = get_settings()
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
         self.bot: Bot | None = None
 
         if self.settings.telegram_bot_token:
@@ -46,8 +47,14 @@ class TelegramService:
         except TelegramError as e:
             print(f"Failed to send Telegram notification: {e}")
             return False
+        except httpx.HTTPError as e:
+            print(f"HTTP error while sending Telegram notification: {e}")
+            return False
+        except (ConnectionError, TimeoutError) as e:
+            print(f"Network error while sending Telegram notification: {e}")
+            return False
         except Exception as e:
-            print(f"Unexpected error sending Telegram notification: {e}")
+            print(f"Unexpected error sending Telegram notification: {type(e).__name__}: {e}")
             return False
 
     async def send_error_notification(self, error_message: str, quote_id: str) -> bool:
@@ -64,8 +71,14 @@ class TelegramService:
 
             return True
 
+        except httpx.HTTPError as e:
+            print(f"HTTP error while sending error notification: {e}")
+            return False
+        except (ConnectionError, TimeoutError) as e:
+            print(f"Network error while sending error notification: {e}")
+            return False
         except Exception as e:
-            print(f"Failed to send error notification: {e}")
+            print(f"Failed to send error notification: {type(e).__name__}: {e}")
             return False
 
     async def test_connection(self) -> bool:
@@ -77,6 +90,12 @@ class TelegramService:
             bot_info = await self.bot.get_me()
             print(f"Telegram bot connected: @{bot_info.username}")
             return True
+        except httpx.HTTPError as e:
+            print(f"HTTP error while testing Telegram connection: {e}")
+            return False
+        except (ConnectionError, TimeoutError) as e:
+            print(f"Network error while testing Telegram connection: {e}")
+            return False
         except Exception as e:
-            print(f"Telegram bot connection failed: {e}")
+            print(f"Telegram bot connection failed: {type(e).__name__}: {e}")
             return False

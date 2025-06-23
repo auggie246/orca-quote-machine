@@ -2,15 +2,15 @@
 
 from _rust_core import CostBreakdown, SlicingResult, calculate_quote_rust
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.models.quote import MaterialType
 
 
 class PricingService:
     """Service for calculating print costs."""
 
-    def __init__(self: "PricingService") -> None:
-        self.settings = get_settings()
+    def __init__(self: "PricingService", settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
 
     def calculate_quote(
         self: "PricingService",
