@@ -1,6 +1,6 @@
 # OrcaSlicer Quotation Generator
 
-A web application for generating 3D printing quotations using OrcaSlicer CLI integration.
+A high-performance web application for generating 3D printing quotations using OrcaSlicer CLI integration with Rust-powered file validation.
 
 ## Features
 
@@ -14,20 +14,27 @@ A web application for generating 3D printing quotations using OrcaSlicer CLI int
 
 ## Architecture
 
-- **FastAPI**: Web server and API endpoints
-- **Rust (PyO3)**: High-performance file validation
-- **Celery + Redis**: Background task processing
-- **OrcaSlicer CLI**: 3D model slicing and analysis
-- **Telegram Bot**: Admin notifications
+- **FastAPI**: Async web server with chunked file upload support
+- **Rust (PyO3)**: High-performance file validation and calculations
+- **Celery + Redis**: Distributed background task processing
+- **OrcaSlicer CLI**: Professional 3D model slicing and G-code generation
+- **Telegram Bot**: Real-time admin notifications
+
+### Documentation
+
+- **AI-Optimized Documentation**: See `ai_docs/` directory for comprehensive codebase analysis
+  - `orca-quote-machine-repomix.xml`: Complete repository structure and code
+  - `orcaslicer-repomix.xml`: OrcaSlicer integration reference
 
 ## Installation
 
 ### Prerequisites
 
+- Python 3.11+
 - [uv](https://docs.astral.sh/uv/) - Fast Python package manager
-- Rust and Cargo
-- Redis server
-- OrcaSlicer (Flatpak installation)
+- Rust and Cargo (for PyO3 bindings)
+- Redis server (v6.0+)
+- OrcaSlicer (Flatpak installation recommended)
 
 ### Setup
 
@@ -220,15 +227,24 @@ uv run python poc_orcaslicer.py [model_file.stl]
 uv run pytest
 ```
 
-### Code Formatting
+### Code Quality
 
 ```bash
+# Format and lint code
 ./scripts/format.sh
-# or manually:
-uv run black .
-uv run isort .
+
+# Manual commands:
+uv run ruff format app tests
+uv run ruff check app tests --fix
 uv run mypy app/
 ```
+
+### Performance Features
+
+- **Streaming file validation**: Memory-efficient processing of large files
+- **Rust-powered calculations**: Fast mesh analysis and validation
+- **Async/await patterns**: Non-blocking I/O operations
+- **Connection pooling**: Optimized database and Redis connections
 
 ## Deployment
 
@@ -278,6 +294,17 @@ server {
 - Application logs: Check FastAPI console output
 - Celery logs: Check worker console output
 - Redis logs: Check Redis server logs
+
+## Contributing
+
+See [CLAUDE.md](CLAUDE.md) for development guidelines and architectural patterns.
+
+## Security
+
+- All file uploads are validated and sanitized
+- Path traversal protection with `secure_filename()`
+- Streaming validation prevents memory exhaustion attacks
+- Environment-based secret management (never commit `.env` files)
 
 ## License
 
