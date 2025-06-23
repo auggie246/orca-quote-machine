@@ -1,7 +1,9 @@
 """Unit tests for telegram service."""
 
-from app.models.quote import TelegramMessage
-from app.services.telegram import TelegramService
+import pytest
+
+from orca_quote_machine.models.quote import TelegramMessage
+from orca_quote_machine.services.telegram import TelegramService
 
 
 class TestTelegramService:
@@ -15,6 +17,7 @@ class TestTelegramService:
         assert hasattr(service, "settings")
         assert hasattr(service, "bot")
 
+    @pytest.mark.asyncio
     async def test_send_quote_notification(self):
         """Test send_quote_notification returns boolean."""
         service = TelegramService()
@@ -35,6 +38,7 @@ class TestTelegramService:
 
         assert isinstance(result, bool)
 
+    @pytest.mark.asyncio
     async def test_send_error_notification(self):
         """Test send_error_notification returns boolean."""
         service = TelegramService()
@@ -43,6 +47,7 @@ class TestTelegramService:
 
         assert isinstance(result, bool)
 
+    @pytest.mark.asyncio
     async def test_test_connection(self):
         """Test test_connection returns boolean."""
         service = TelegramService()

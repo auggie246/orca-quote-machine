@@ -19,7 +19,7 @@ fi
 echo "Environment: $(cat .env | grep DEBUG || echo 'DEBUG=true')"
 echo "Starting FastAPI web server..."
 
-uv run uvicorn app.main:app \
+uv run uvicorn orca_quote_machine.main:app \
     --reload \
     --host 0.0.0.0 \
     --port 8000 \

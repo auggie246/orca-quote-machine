@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
 use pyo3_asyncio::tokio::future_into_py;
 use regex::Regex;
+use once_cell::sync::Lazy;
+use sanitize_filename::sanitize;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -52,7 +54,7 @@ impl ModelInfo {
 #[pyfunction]
 fn validate_stl(file_path: String) -> PyResult<ModelInfo> {
     let path = Path::new(&file_path);
-    
+
     if !path.exists() {
         return Ok(ModelInfo {
             file_type: "stl".to_string(),
@@ -63,11 +65,12 @@ fn validate_stl(file_path: String) -> PyResult<ModelInfo> {
     }
 
     let file_size = fs::metadata(path)?.len();
-    
-    // Read first few bytes to determine if binary or ASCII STL
-    let data = fs::read(path)?;
-    
-    if data.len() < 84 {
+    let mut file = fs::File::open(path)?;
+
+    // Read only the first 5 bytes to check for "solid" prefix.
+    let mut header = [0u8; 5];
+    if file.read_exact(&mut header).is_err() {
+        // File is too small to be a valid STL of any kind.
         return Ok(ModelInfo {
             file_type: "stl".to_string(),
             file_size,
@@ -76,62 +79,68 @@ fn validate_stl(file_path: String) -> PyResult<ModelInfo> {
         });
     }
 
-    // Check if it's ASCII STL (starts with "solid")
-    if data.starts_with(b"solid") {
-        // For ASCII STL, use buffered reading to avoid loading entire file
-        let file = fs::File::open(path)?;
+    if header.starts_with(b"solid") {
+        // ASCII STL: Use a buffered reader on the existing file handle.
+        // We must seek back to the start to read from the beginning.
+        file.seek(SeekFrom::Start(0))?;
         let reader = BufReader::new(file);
-        
         let mut found_endsolid = false;
         for line in reader.lines() {
-            let line = line?;
-            if line.trim().starts_with("endsolid") {
+            if line?.trim().starts_with("endsolid") {
                 found_endsolid = true;
                 break;
             }
         }
         
-        return Ok(ModelInfo {
+        Ok(ModelInfo {
             file_type: "stl".to_string(),
             file_size,
             is_valid: found_endsolid,
-            error_message: if found_endsolid { None } else { Some("Invalid ASCII STL format - missing endsolid".to_string()) },
-        });
+            error_message: if found_endsolid { 
+                None 
+            } else { 
+                Some("Invalid ASCII STL format - missing endsolid".to_string()) 
+            },
+        })
+    } else {
+        // Binary STL: Efficiently validate without reading the whole file.
+        if file_size < 84 {
+            return Ok(ModelInfo {
+                file_type: "stl".to_string(),
+                file_size,
+                is_valid: false,
+                error_message: Some("Binary STL too small".to_string()),
+            });
+        }
+
+        // Read only the triangle count from bytes 80-83.
+        let mut count_buffer = [0u8; 4];
+        file.seek(SeekFrom::Start(80))?;
+        file.read_exact(&mut count_buffer)?;
+        let triangle_count = u32::from_le_bytes(count_buffer);
+
+        let expected_size = 84u64.saturating_add(triangle_count as u64 * 50);
+
+        if file_size != expected_size {
+            Ok(ModelInfo {
+                file_type: "stl".to_string(),
+                file_size,
+                is_valid: false,
+                error_message: Some(format!(
+                    "Binary STL size mismatch. Expected {}, got {}",
+                    expected_size,
+                    file_size
+                )),
+            })
+        } else {
+            Ok(ModelInfo {
+                file_type: "stl".to_string(),
+                file_size,
+                is_valid: true,
+                error_message: None,
+            })
+        }
     }
-
-    // Binary STL validation
-    if data.len() < 84 {
-        return Ok(ModelInfo {
-            file_type: "stl".to_string(),
-            file_size,
-            is_valid: false,
-            error_message: Some("Binary STL too small".to_string()),
-        });
-    }
-
-    // Read triangle count from bytes 80-83
-    let triangle_count = u32::from_le_bytes([data[80], data[81], data[82], data[83]]);
-    let expected_size = 80 + 4 + (triangle_count * 50); // Header + count + triangles
-
-    if data.len() as u32 != expected_size {
-        return Ok(ModelInfo {
-            file_type: "stl".to_string(),
-            file_size,
-            is_valid: false,
-            error_message: Some(format!(
-                "Binary STL size mismatch. Expected {}, got {}",
-                expected_size,
-                data.len()
-            )),
-        });
-    }
-
-    Ok(ModelInfo {
-        file_type: "stl".to_string(),
-        file_size,
-        is_valid: true,
-        error_message: None,
-    })
 }
 
 /// Basic validation for OBJ files
@@ -263,10 +272,10 @@ fn validate_step(file_path: String) -> PyResult<ModelInfo> {
 fn validate_3d_model(file_path: String) -> PyResult<ModelInfo> {
     let path = Path::new(&file_path);
     
-    match path.extension().and_then(|ext| ext.to_str()) {
-        Some("stl") | Some("STL") => validate_stl(file_path),
-        Some("obj") | Some("OBJ") => validate_obj(file_path),
-        Some("step") | Some("STEP") | Some("stp") | Some("STP") => validate_step(file_path),
+    match path.extension().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) {
+        Some(ext) if ext == "stl" => validate_stl(file_path),
+        Some(ext) if ext == "obj" => validate_obj(file_path),
+        Some(ext) if ext == "step" || ext == "stp" => validate_step(file_path),
         _ => Ok(ModelInfo {
             file_type: "unknown".to_string(),
             file_size: 0,
@@ -358,24 +367,26 @@ impl CostBreakdown {
     }
 }
 
+// Static regex definitions for performance
+static TIME_HOUR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+)h").unwrap());
+static TIME_MINUTE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+)m").unwrap());
+static TIME_MINUTE_ONLY_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\d+)$").unwrap());
+static FILAMENT_WEIGHT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+\.?\d*)\s*g").unwrap());
+static LAYER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+)").unwrap());
+
 /// Parse time string to minutes using Rust regex for performance
 fn parse_time_string_to_minutes(time_str: &str) -> u32 {
-    // Create regexes for common time formats
-    let hour_regex = Regex::new(r"(\d+)h").unwrap();
-    let minute_regex = Regex::new(r"(\d+)m").unwrap();
-    let minute_only_regex = Regex::new(r"^(\d+)$").unwrap();
-    
     let clean_str = time_str.trim().to_lowercase();
     let mut minutes = 0;
     
     // Parse "1h 30m" format
-    if let Some(hour_cap) = hour_regex.captures(&clean_str) {
+    if let Some(hour_cap) = TIME_HOUR_REGEX.captures(&clean_str) {
         if let Ok(hours) = hour_cap[1].parse::<u32>() {
             minutes += hours * 60;
         }
     }
     
-    if let Some(min_cap) = minute_regex.captures(&clean_str) {
+    if let Some(min_cap) = TIME_MINUTE_REGEX.captures(&clean_str) {
         if let Ok(mins) = min_cap[1].parse::<u32>() {
             minutes += mins;
         }
@@ -383,7 +394,7 @@ fn parse_time_string_to_minutes(time_str: &str) -> u32 {
     
     // Parse minutes-only format if no hours/minutes pattern found
     if minutes == 0 {
-        if let Some(min_only_cap) = minute_only_regex.captures(&clean_str) {
+        if let Some(min_only_cap) = TIME_MINUTE_ONLY_REGEX.captures(&clean_str) {
             if let Ok(mins) = min_only_cap[1].parse::<u32>() {
                 minutes = mins;
             }
@@ -395,9 +406,7 @@ fn parse_time_string_to_minutes(time_str: &str) -> u32 {
 
 /// Parse filament weight from G-code comment using Rust regex
 fn parse_filament_weight(line: &str) -> Option<f32> {
-    let weight_regex = Regex::new(r"(\d+\.?\d*)\s*g").unwrap();
-    
-    if let Some(cap) = weight_regex.captures(line) {
+    if let Some(cap) = FILAMENT_WEIGHT_REGEX.captures(line) {
         cap[1].parse::<f32>().ok()
     } else {
         None
@@ -451,8 +460,7 @@ fn parse_slicer_output(py: Python, output_dir: String) -> PyResult<&PyAny> {
                 }
                 // Parse layer count
                 else if lower_line.contains("; layer_count") || lower_line.contains("; total layers") {
-                    let layer_regex = Regex::new(r"(\d+)").unwrap();
-                    if let Some(cap) = layer_regex.captures(&line) {
+                    if let Some(cap) = LAYER_REGEX.captures(&line) {
                         layer_count = cap[1].parse::<u32>().ok();
                     }
                 }
@@ -556,89 +564,10 @@ fn cleanup_old_files_rust(upload_dir: String, max_age_hours: u64) -> PyResult<Cl
     Ok(stats)
 }
 
-/// Fix inefficient STL validation to use buffered I/O
+/// Sanitize a filename to remove characters that are not allowed by the OS.
 #[pyfunction]
-fn validate_stl_optimized(file_path: String) -> PyResult<ModelInfo> {
-    let path = Path::new(&file_path);
-    
-    if !path.exists() {
-        return Ok(ModelInfo {
-            file_type: "stl".to_string(),
-            file_size: 0,
-            is_valid: false,
-            error_message: Some("File not found".to_string()),
-        });
-    }
-
-    let file_size = fs::metadata(path)?.len();
-    let mut file = fs::File::open(path)?;
-
-    // Read first 5 bytes to check for "solid"
-    let mut header = [0u8; 5];
-    file.read_exact(&mut header)?;
-
-    // Reset cursor to the beginning of the file
-    file.seek(SeekFrom::Start(0))?;
-
-    if &header == b"solid" {
-        // ASCII STL: Use a buffered reader on the existing file handle
-        let reader = BufReader::new(file);
-        let mut found_endsolid = false;
-        for line in reader.lines() {
-            if line?.trim().starts_with("endsolid") {
-                found_endsolid = true;
-                break;
-            }
-        }
-        
-        Ok(ModelInfo {
-            file_type: "stl".to_string(),
-            file_size,
-            is_valid: found_endsolid,
-            error_message: if found_endsolid { 
-                None 
-            } else { 
-                Some("Invalid ASCII STL format - missing endsolid".to_string()) 
-            },
-        })
-    } else {
-        // Binary STL: Read the whole file now that we know we need to
-        let mut data = Vec::new();
-        file.read_to_end(&mut data)?;
-        
-        if data.len() < 84 {
-            return Ok(ModelInfo {
-                file_type: "stl".to_string(),
-                file_size,
-                is_valid: false,
-                error_message: Some("Binary STL too small".to_string()),
-            });
-        }
-
-        // Read triangle count from bytes 80-83
-        let triangle_count = u32::from_le_bytes([data[80], data[81], data[82], data[83]]);
-        let expected_size = 80 + 4 + (triangle_count * 50); // Header + count + triangles
-
-        if data.len() as u32 != expected_size {
-            Ok(ModelInfo {
-                file_type: "stl".to_string(),
-                file_size,
-                is_valid: false,
-                error_message: Some(format!(
-                    "Binary STL size mismatch. Expected {}, got {}",
-                    expected_size,
-                    data.len()
-                )),
-            })
-        } else {
-            Ok(ModelInfo {
-                file_type: "stl".to_string(),
-                file_size,
-                is_valid: true,
-                error_message: None,
-            })
-        }
-    }
+fn secure_filename(filename: String) -> PyResult<String> {
+    Ok(sanitize(filename))
 }
 
 /// Python module definition
@@ -649,12 +578,12 @@ fn _rust_core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_obj, m)?)?;
     m.add_function(wrap_pyfunction!(validate_step, m)?)?;
     m.add_function(wrap_pyfunction!(validate_3d_model, m)?)?;
+    m.add_function(wrap_pyfunction!(secure_filename, m)?)?;
     
     // Enhanced performance functions
     m.add_function(wrap_pyfunction!(parse_slicer_output, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_quote_rust, m)?)?;
     m.add_function(wrap_pyfunction!(cleanup_old_files_rust, m)?)?;
-    m.add_function(wrap_pyfunction!(validate_stl_optimized, m)?)?;
     
     // Data classes
     m.add_class::<ModelInfo>()?;

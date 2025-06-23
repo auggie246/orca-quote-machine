@@ -2,8 +2,8 @@
 
 from unittest.mock import patch
 
-from app.models.quote import MaterialType
-from app.services.slicer import OrcaSlicerService
+from orca_quote_machine.models.quote import MaterialType
+from orca_quote_machine.services.slicer import OrcaSlicerService
 
 
 class TestOrcaSlicerService:

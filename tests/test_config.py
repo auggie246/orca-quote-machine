@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings, SlicerProfileSettings, get_settings
+from orca_quote_machine.core.config import Settings, SlicerProfileSettings, get_settings
 
 
 class TestCustomValidationLogic:
@@ -168,7 +168,7 @@ class TestSlicerProfileSettings:
 
             # Test our updated default choices that match actual files
             assert slicer_settings.machine == "RatRig V-Core 3 400 0.5 nozzle.json"
-            assert slicer_settings.process == "0.25mm RatRig 0.5mm nozzle - slower.json"
-            assert slicer_settings.filament_pla == "Alt Tab PLA+.json"
-            assert slicer_settings.filament_petg == "Polymaker PETG PEI.json"
-            assert slicer_settings.filament_asa == "fusrock ASA G11.json"
+            assert slicer_settings.process == "0.2mm RatRig 0.5mm nozzle.json"
+            assert slicer_settings.filament_pla == "ALT TABL MATTE PLA PEI.json"
+            assert slicer_settings.filament_petg == "Alt Tab PETG.json"
+            assert slicer_settings.filament_asa == "fusrock ASA.json"

@@ -42,11 +42,17 @@ class TestQuoteEndpoint:
         client: TestClient,
         sample_stl_content: bytes,
         sample_quote_data: dict,
-        mock_orcaslicer_service: MagicMock,
-        mock_pricing_service: MagicMock,
-        mock_telegram_service: MagicMock,
+        mocker: MockerFixture,
     ) -> None:
         """Test successful quote creation with valid data."""
+        # Mock the Celery task
+        mock_task = mocker.patch('orca_quote_machine.main.process_quote_request.delay')
+        mock_task.return_value = MagicMock(id="test-task-id")
+
+        # Mock slicer service's get_available_materials method
+        mock_slicer = mocker.patch('orca_quote_machine.services.slicer.OrcaSlicerService.get_available_materials')
+        mock_slicer.return_value = ["PLA", "PETG", "ASA", "TPU"]
+
         files = {
             "model_file": ("test.stl", sample_stl_content, "application/octet-stream")
         }
@@ -159,7 +165,7 @@ class TestTaskStatusEndpoint:
     ) -> None:
         """Test getting status of a pending task."""
         # Mock celery result
-        mock_result = mocker.patch("app.main.celery_app.AsyncResult")
+        mock_result = mocker.patch("orca_quote_machine.main.celery_app.AsyncResult")
         mock_result.return_value.state = "PENDING"
 
         response = client.get("/status/test-task-id")
@@ -173,7 +179,7 @@ class TestTaskStatusEndpoint:
         self, client: TestClient, mocker: MockerFixture
     ) -> None:
         """Test getting status of a successful task."""
-        mock_result = mocker.patch("app.main.celery_app.AsyncResult")
+        mock_result = mocker.patch("orca_quote_machine.main.celery_app.AsyncResult")
         mock_result.return_value.state = "SUCCESS"
         mock_result.return_value.result = {"total_cost": 25.50}
 
@@ -189,7 +195,7 @@ class TestTaskStatusEndpoint:
         self, client: TestClient, mocker: MockerFixture
     ) -> None:
         """Test getting status of a failed task."""
-        mock_result = mocker.patch("app.main.celery_app.AsyncResult")
+        mock_result = mocker.patch("orca_quote_machine.main.celery_app.AsyncResult")
         mock_result.return_value.state = "FAILURE"
         mock_result.return_value.info = "Slicing failed"
 
